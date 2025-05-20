@@ -1,0 +1,140 @@
+{
+	"name": "blogforge",
+	"version": "0.1.7",
+	"description": "A powerful CLI tool for managing Nuxt Content v3 blogs",
+	"type": "module",
+	"main": "dist/index.js",
+	"bin": {
+		"blogforge": "dist/index.js"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup src/index.ts --format esm --dts",
+		"dev": "tsx src/index.ts",
+		"start": "node dist/index.js",
+		"prepublishOnly": "npm run build",
+		"lint": "biome lint ./src",
+		"lint:fix": "biome lint --apply ./src",
+		"format": "biome format ./src",
+		"format:fix": "biome format --write ./src",
+		"test": "echo \\\"Error: no test specified\\\" && exit 1",
+		"prepare": "husky",
+		"release": "standard-version",
+		"commit": "cz"
+	},
+	"keywords": [
+		"nuxt",
+		"content",
+		"blog",
+		"cli",
+		"markdown",
+		"nuxt,content,blog,cli,markdown,commandline"
+	],
+	"author": "",
+	"license": "MIT",
+	"dependencies": {
+		"boxen": "^8.0.1",
+		"chalk": "^5.4.1",
+		"citty": "^0.1.6",
+		"cli-table3": "^0.6.5",
+		"diff": "^8.0.1",
+		"figlet": "^1.8.1",
+		"fs-extra": "^11.3.0",
+		"fuse.js": "^7.1.0",
+		"ink": "^5.2.1",
+		"js-yaml": "^4.1.0",
+		"ora": "^8.2.0",
+		"prompts": "^2.4.2",
+		"sharp": "^0.34.1",
+		"tsx": "^4.19.4",
+		"zod": "^3.24.4"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@commitlint/cli": "^19.8.1",
+		"@commitlint/config-conventional": "^19.8.1",
+		"@types/figlet": "^1.7.0",
+		"@types/fs-extra": "^11.0.4",
+		"@types/js-yaml": "^4.0.9",
+		"@types/node": "^22.15.18",
+		"@types/prompts": "^2.4.9",
+		"@types/semver": "^7.7.0",
+		"commitizen": "^4.3.1",
+		"cz-conventional-changelog": "^3.3.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.0.0",
+		"semver": "^7.7.2",
+		"standard-version": "^9.5.0",
+		"tsup": "^8.5.0",
+		"typescript": "^5.8.3"
+	},
+	"engines": {
+		"node": ">=20"
+	},
+	"config": {
+		"commitizen": {
+			"path": "cz-conventional-changelog"
+		}
+	},
+	"standard-version": {
+		"standard-version": {
+			"commitAll": true,
+			"scripts": {
+				"postchangelog": "echo 'CHANGELOG.md updated'"
+			},
+			"skip": {
+				"tag": false
+			},
+			"releaseCommitMessageFormat": "chore(release): {{currentTag}} [skip ci]",
+			"types": [
+				{
+					"type": "feat",
+					"section": "Features"
+				},
+				{
+					"type": "fix",
+					"section": "Bug Fixes"
+				},
+				{
+					"type": "docs",
+					"section": "Documentation"
+				},
+				{
+					"type": "style",
+					"section": "Styling"
+				},
+				{
+					"type": "refactor",
+					"section": "Code Refactoring"
+				},
+				{
+					"type": "perf",
+					"section": "Performance Improvements"
+				},
+				{
+					"type": "test",
+					"section": "Tests"
+				},
+				{
+					"type": "build",
+					"section": "Build System"
+				},
+				{
+					"type": "ci",
+					"section": "Continuous Integration"
+				}
+			]
+		}
+	},
+	"lint-staged": {
+		"*.{js,ts,tsx}": [
+			"biome check --write"
+		]
+	},
+	"homepage": "https://github.com/lord007tn/BlogForge",
+	"bugs": {
+		"url": "https://github.com/lord007tn/BlogForge/issues"
+	}
+}

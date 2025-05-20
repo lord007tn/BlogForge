@@ -1,0 +1,107 @@
+name: Create and Publish Release
+
+on:
+  push:
+    branches:
+      - master # Change to 'main' if that's your default branch
+    # Remove the paths-ignore section completely
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: github.repository == 'lord007tn/BlogForge' && !contains(github.event.head_commit.message, 'chore(release)')
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+      release_created: ${{ steps.tag_version.outputs.release_created }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Check commit type
+        id: check_commit
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=format:%s)
+          if [[ $COMMIT_MSG == fix:* || $COMMIT_MSG == feat:* || $COMMIT_MSG == feat!:* || $COMMIT_MSG == fix!:* ]]; then
+            echo "is_release_commit=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_release_commit=false" >> $GITHUB_OUTPUT
+          fi
+          echo "Commit message: $COMMIT_MSG"
+          echo "Is release commit: $(cat $GITHUB_OUTPUT | grep is_release_commit | cut -d= -f2)"
+
+      - name: Run standard-version
+        id: tag_version
+        if: steps.check_commit.outputs.is_release_commit == 'true'
+        run: |
+          npm run release
+          echo "release_created=true" >> $GITHUB_OUTPUT
+          NEW_TAG=$(git describe --tags --abbrev=0)
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "Created new tag: $NEW_TAG"
+
+      - name: Push changes and tags
+        if: steps.tag_version.outputs.release_created == 'true'
+        run: |
+          git push --follow-tags origin ${{ github.ref_name }}
+
+      - name: Create GitHub Release
+        if: steps.tag_version.outputs.release_created == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
+          name: ${{ steps.tag_version.outputs.new_tag }}
+          body_path: "CHANGELOG.md"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-npm:
+    needs: release
+    runs-on: ubuntu-latest
+    if: needs.release.outputs.release_created == 'true' && github.repository == 'lord007tn/BlogForge'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.new_tag }}
+          fetch-depth: 0
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+          registry-url: 'https://registry.npmjs.org/'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build package
+        run: npm run build
+      
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
