@@ -95,10 +95,6 @@ export default defineCommand({
 					type: "string",
 					description: "Canonical URL",
 				},
-				keywords: {
-					type: "string",
-					description: "SEO keywords (comma-separated)",
-				},
 				slug: {
 					type: "string",
 					description: "Custom slug (defaults to generated from title)",
@@ -167,7 +163,6 @@ export default defineCommand({
 					canonicalURL: args.canonicalURL
 						? String(args.canonicalURL)
 						: undefined,
-					keywords: args.keywords ? String(args.keywords) : undefined,
 					slug: args.slug ? String(args.slug) : undefined,
 					filename: args.filename ? String(args.filename) : undefined,
 					content: args.content ? String(args.content) : undefined,

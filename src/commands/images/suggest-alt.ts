@@ -7,12 +7,12 @@ import { getProjectPaths } from "../../utils/project";
 
 // Interface for alt text issues
 interface AltTextIssue {
-  article: string;
-  image: string;
-  line: number;
-  context: string;
-  issue: 'missing' | 'empty' | 'too_short' | 'too_generic';
-  alt?: string;
+	article: string;
+	image: string;
+	line: number;
+	context: string;
+	issue: "missing" | "empty" | "too_short" | "too_generic";
+	alt?: string;
 }
 
 export async function suggestMissingAltText(opts: {
@@ -85,7 +85,7 @@ export async function suggestMissingAltText(opts: {
 				for (const match of imageMatches) {
 					const alt = match[1];
 					const image = match[2];
-					
+
 					// Get context (the surrounding text)
 					const startLine = Math.max(0, i - 2);
 					const endLine = Math.min(lines.length - 1, i + 2);
@@ -99,7 +99,7 @@ export async function suggestMissingAltText(opts: {
 							image,
 							line: i + 1,
 							context,
-							issue: 'missing'
+							issue: "missing",
 						});
 					} else if (alt.trim() === "") {
 						// Empty alt text
@@ -108,7 +108,7 @@ export async function suggestMissingAltText(opts: {
 							image,
 							line: i + 1,
 							context,
-							issue: 'empty'
+							issue: "empty",
 						});
 					} else if (alt.trim().length < 5) {
 						// Too short alt text
@@ -117,8 +117,8 @@ export async function suggestMissingAltText(opts: {
 							image,
 							line: i + 1,
 							context,
-							issue: 'too_short',
-							alt: alt.trim()
+							issue: "too_short",
+							alt: alt.trim(),
 						});
 					} else if (isGenericAltText(alt.trim())) {
 						// Generic alt text
@@ -127,8 +127,8 @@ export async function suggestMissingAltText(opts: {
 							image,
 							line: i + 1,
 							context,
-							issue: 'too_generic',
-							alt: alt.trim()
+							issue: "too_generic",
+							alt: alt.trim(),
 						});
 					}
 				}
@@ -180,19 +180,27 @@ export async function suggestMissingAltText(opts: {
 
 	for (const item of altTextIssues) {
 		// Format issue type
-		let issueType;
+		let issueType: string;
 		switch (item.issue) {
-			case 'missing': issueType = 'Missing'; break;
-			case 'empty': issueType = 'Empty'; break;
-			case 'too_short': issueType = 'Too short'; break;
-			case 'too_generic': issueType = 'Too generic'; break;
+			case "missing":
+				issueType = "Missing";
+				break;
+			case "empty":
+				issueType = "Empty";
+				break;
+			case "too_short":
+				issueType = "Too short";
+				break;
+			case "too_generic":
+				issueType = "Too generic";
+				break;
 		}
 
 		table.push([
-			item.article, 
-			issueType, 
-			item.alt || '(none)', 
-			String(item.line)
+			item.article,
+			issueType,
+			item.alt || "(none)",
+			String(item.line),
 		]);
 	}
 
@@ -211,7 +219,9 @@ export async function suggestMissingAltText(opts: {
 	console.log("1. Be specific and descriptive about the image content.");
 	console.log("2. Keep it concise (around 125 characters or less).");
 	console.log(`3. Don't start with "Image of" or "Picture of".`);
-	console.log("4. Consider the context and purpose of the image in the article.");
+	console.log(
+		"4. Consider the context and purpose of the image in the article.",
+	);
 	console.log(`5. Include keywords when relevant, but don't keyword stuff.`);
 
 	return { missing: altTextIssues, total: articleFiles.length };
@@ -230,7 +240,7 @@ async function getMarkdownFiles(dir: string, base = ""): Promise<string[]> {
 		const relativePath = base ? path.join(base, file) : file;
 
 		if (stat.isDirectory()) {
-			result.push(...await getMarkdownFiles(filePath, relativePath));
+			result.push(...(await getMarkdownFiles(filePath, relativePath)));
 		} else if (file.endsWith(".md")) {
 			result.push(relativePath);
 		}
@@ -244,24 +254,36 @@ async function getMarkdownFiles(dir: string, base = ""): Promise<string[]> {
  */
 function isGenericAltText(alt: string): boolean {
 	const genericPhrases = [
-		'image', 'picture', 'photo', 'screenshot', 'illustration',
-		'image of', 'picture of', 'photo of', 'screenshot of', 'illustration of',
-		'thumbnail', 'icon', 'logo', 'banner', 'graphic'
+		"image",
+		"picture",
+		"photo",
+		"screenshot",
+		"illustration",
+		"image of",
+		"picture of",
+		"photo of",
+		"screenshot of",
+		"illustration of",
+		"thumbnail",
+		"icon",
+		"logo",
+		"banner",
+		"graphic",
 	];
-	
+
 	const lowercaseAlt = alt.toLowerCase();
-	
+
 	// Check for single-word generic terms
 	if (genericPhrases.includes(lowercaseAlt)) {
 		return true;
 	}
-	
+
 	// Check for phrases that start with generic terms
 	for (const phrase of genericPhrases) {
-		if (lowercaseAlt.startsWith(phrase + ' ')) {
+		if (lowercaseAlt.startsWith(`${phrase} `)) {
 			return true;
 		}
 	}
-	
+
 	return false;
 }

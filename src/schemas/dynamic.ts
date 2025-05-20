@@ -201,7 +201,6 @@ export function createArticleSchema(
 		publishedAt: z.string().optional(),
 		updatedAt: z.string().optional(),
 		canonicalURL: z.string().optional(),
-		keywords: z.string().optional(),
 	});
 
 	// Merge with user schema if available
@@ -234,7 +233,6 @@ export function createArticleSchema(
 					"publishedAt",
 					"updatedAt",
 					"canonicalURL",
-					"keywords",
 				].includes(fieldName)
 			) {
 				userFields[fieldName] = createZodTypeForField(fieldDef, config);

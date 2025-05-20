@@ -14,14 +14,10 @@ export interface FindUnusedImagesOptions {
 export async function findUnusedImages(opts: FindUnusedImagesOptions) {
 	const spinner = logger.spinner("Finding unused images");
 
-	// Get project paths
 	let imagesDir: string;
 	let articlesDir: string;
-
 	try {
 		const paths = await getProjectPaths(process.cwd());
-
-		// Use custom directory if provided, or default to public/images
 		if (opts.directory) {
 			imagesDir = path.isAbsolute(opts.directory)
 				? opts.directory
@@ -29,30 +25,24 @@ export async function findUnusedImages(opts: FindUnusedImagesOptions) {
 		} else {
 			imagesDir = path.join(paths.public, "images");
 		}
-
 		articlesDir = paths.articles;
-
 		spinner.text = "Checking directories";
 	} catch (e) {
 		logger.spinnerError(`Project validation failed: ${(e as Error).message}`);
 		return;
 	}
 
-	// Check if directories exist
 	if (!(await fs.pathExists(imagesDir))) {
 		logger.spinnerError(`Images directory not found: ${imagesDir}`);
 		return;
 	}
-
 	if (!(await fs.pathExists(articlesDir))) {
 		logger.spinnerError(`Articles directory not found: ${articlesDir}`);
 		return;
 	}
 
-	// Get all image files
 	spinner.text = "Finding all images";
 	let imageFiles: string[];
-
 	try {
 		imageFiles = (await fs.readdir(imagesDir)).filter((file) =>
 			/\.(jpe?g|png|gif|webp|avif|svg)$/i.test(file),
@@ -65,16 +55,13 @@ export async function findUnusedImages(opts: FindUnusedImagesOptions) {
 		);
 		return;
 	}
-
 	if (!imageFiles.length) {
 		logger.spinnerWarn("No images found to check.");
 		return;
 	}
 
-	// Get all article files
 	spinner.text = "Finding all articles";
 	let articleFiles: string[];
-
 	try {
 		articleFiles = (await fs.readdir(articlesDir)).filter((file) =>
 			file.endsWith(".md"),
@@ -87,65 +74,42 @@ export async function findUnusedImages(opts: FindUnusedImagesOptions) {
 		);
 		return;
 	}
-
 	if (!articleFiles.length) {
 		logger.spinnerWarn("No articles found to check against.");
 		return;
 	}
 
-	// Track used images
 	const usedImages = new Set<string>();
-
-	// Check each article for image references
 	spinner.text = "Analyzing image references in articles";
-
 	for (const articleFile of articleFiles) {
 		const filePath = path.join(articlesDir, articleFile);
-
 		try {
 			const content = await fs.readFile(filePath, "utf-8");
 			const { frontmatter } = extractFrontmatter(content);
-
-			// Check featured image in frontmatter
 			if (frontmatter.image && typeof frontmatter.image === "string") {
 				const imgPath = frontmatter.image;
-
-				// Extract just the filename if it's a path
 				if (imgPath.includes("/")) {
-					const imgFilename = path.basename(imgPath);
-					usedImages.add(imgFilename);
+					usedImages.add(path.basename(imgPath));
 				} else {
 					usedImages.add(imgPath);
 				}
 			}
-
-			// Check inline images in markdown content
 			const imageMatches = [...content.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)];
-
 			for (const match of imageMatches) {
 				const imgPath = match[2];
-
-				// Extract just the filename if it's a path
 				if (imgPath.includes("/")) {
-					const imgFilename = path.basename(imgPath);
-					usedImages.add(imgFilename);
+					usedImages.add(path.basename(imgPath));
 				} else {
 					usedImages.add(imgPath);
 				}
 			}
-
-			// Also check for images referenced in HTML
 			const htmlImageMatches = [
 				...content.matchAll(/<img[^>]*src=["']([^"']+)["'][^>]*>/g),
 			];
-
 			for (const match of htmlImageMatches) {
 				const imgPath = match[1];
-
-				// Extract just the filename if it's a path
 				if (imgPath.includes("/")) {
-					const imgFilename = path.basename(imgPath);
-					usedImages.add(imgFilename);
+					usedImages.add(path.basename(imgPath));
 				} else {
 					usedImages.add(imgPath);
 				}
@@ -154,9 +118,7 @@ export async function findUnusedImages(opts: FindUnusedImagesOptions) {
 			if (opts.verbose) {
 				console.log(
 					chalk.yellow(
-						`Warning: Could not analyze ${articleFile}: ${
-							(error as Error).message
-						}`,
+						`Warning: Could not analyze ${articleFile}: ${(error as Error).message}`,
 					),
 				);
 			}

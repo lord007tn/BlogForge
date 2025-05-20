@@ -193,6 +193,7 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [ ] Interactive onboarding and guided setup for new users.
 - [ ] Advanced linting and formatting for markdown and frontmatter.
 - [ ] Batch operations for bulk content management.
+- [ ] Translation helper: Integrate with translation systems and auto-translate content.
 
 ### Nuxt Content Collection Sources Support
 

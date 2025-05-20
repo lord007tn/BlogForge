@@ -22,7 +22,6 @@ export const ArticleCollectionTemplate = (
       series: z.string().optional(),
       seriesIndex: z.number().optional(),
       canonicalURL: z.string().optional(),
-      keywords: z.string().optional(),
       slug: z.string().min(1)
     })
   })`;
@@ -190,7 +189,6 @@ const localizedString = (isRequired = true) => {
       publishedAt: z.string().optional(),
       updatedAt: z.string().optional(),
       canonicalURL: z.string().optional(),
-      keywords: z.string().optional()
     })
   })`,
 

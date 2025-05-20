@@ -396,11 +396,6 @@ function wrapText(text: string, width: number): string[] {
 	return lines;
 }
 
-// Helper to wrap and join cell content
-function wrapAndJoinCell(text: string, width: number): string {
-	return wrapText(text, width).join("\n");
-}
-
 export async function seoCheck(opts: SeoCheckOptions) {
 	const spinner = logger.spinner("Initializing SEO check");
 

@@ -90,8 +90,6 @@ export async function searchArticles(opts: {
 			author: String(parsedFrontmatter.author ?? ""),
 			tags: parsedFrontmatter.tags ?? [],
 			category: String(parsedFrontmatter.category ?? ""),
-			// Assuming keywords is string[] in schema based on typical usage. Adjust if it's just a string.
-			keywords: parsedFrontmatter.keywords ?? [],
 			file, // Add the filename
 			content, // Add the markdown content
 		};
@@ -109,7 +107,7 @@ export async function searchArticles(opts: {
 		searchKeys.push("content");
 	} else {
 		// Default search in metadata
-		searchKeys.push("title", "description", "category", "author", "keywords");
+		searchKeys.push("title", "description", "category", "author");
 	}
 
 	const fuse = new Fuse(articlesData, {
@@ -125,13 +123,11 @@ export async function searchArticles(opts: {
 		message: "Enter search term (type for suggestions):",
 		async suggest(input: string, _choices: Choice[]) {
 			if (!input) {
-				return articlesData
-					.slice(0, 5)
-					.map((article) => ({
-						title: article.title,
-						value: article.title,
-						description: article.file,
-					}));
+				return articlesData.slice(0, 5).map((article) => ({
+					title: article.title,
+					value: article.title,
+					description: article.file,
+				}));
 			}
 			const results = fuse.search(input);
 			return results.slice(0, 10).map((result) => ({

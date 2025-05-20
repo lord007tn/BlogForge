@@ -1,38 +1,24 @@
 import path from "node:path";
 import chalk from "chalk";
 import fs from "fs-extra";
-import {
-	type Article,
-	articleSchema,
-	normalizeMultilingualText,
-} from "../../schemas";
+import { articleSchema, normalizeMultilingualText } from "../../schemas";
 import { updateFrontmatter } from "../../utils/frontmatter";
 import { logger } from "../../utils/logger";
 import type { ProjectPaths } from "../../utils/project";
 import { getProjectPaths } from "../../utils/project";
+import type { Article } from "../../schemas";
 
-export async function createArticle(opts: {
+export interface CreateArticleOptions
+	extends Partial<Omit<Article, "tags" | "title" | "description">> {
 	verbose?: boolean;
 	title?: string | Record<string, string>;
 	description?: string | Record<string, string>;
-	author?: string;
 	tags?: string;
-	locale?: string;
-	isDraft?: boolean;
-	category?: string;
-	image?: string;
-	readingTime?: number;
-	isFeatured?: boolean;
-	publishedAt?: string;
-	updatedAt?: string;
-	series?: string;
-	seriesIndex?: number;
-	canonicalURL?: string;
-	keywords?: string;
-	slug?: string;
 	filename?: string;
 	content?: string;
-}) {
+}
+
+export async function createArticle(opts: CreateArticleOptions) {
 	const spinner = logger.spinner("Initializing article creation");
 
 	// Get project paths
@@ -180,8 +166,7 @@ export async function createArticle(opts: {
 		updatedAt: opts.updatedAt || "",
 		series: opts.series || "",
 		seriesIndex: opts.seriesIndex,
-		canonicalURL: opts.canonicalURL || "",
-		keywords: opts.keywords || "",
+	canonicalURL: opts.canonicalURL || "",
 		slug,
 	};
 

@@ -13,10 +13,3 @@ All notable changes to this project will be documented in this file. See [standa
 ### Bug Fixes
 
 * husky hooks ([9f61d1f](https://github.com/lord007tn/BlogForge/commit/9f61d1fe2a8b4e9e1ec27016597a5a15993525af))
-
-### 0.1.1 (2025-05-20)
-
-
-### Features
-
-* first release ([287fc56](https://github.com/lord007tn/BlogForge/commit/287fc56ba47e51a7b249522603daa9e1a4edf85c))
