@@ -78,7 +78,7 @@ export default defineCommand({
 			run: async ({ args }) => {
 				try {
 					await convertImages({
-						to: args.to ? String(args.to) : "avif",
+						to: args.to ? String(args.to) : "",
 						quality: Number(args.quality),
 						directory: args.directory ? String(args.directory) : undefined,
 						verbose: Boolean(args.verbose),
@@ -124,7 +124,8 @@ export default defineCommand({
 
 		validate: defineCommand({
 			meta: {
-				description: "Validate image references in articles",
+				description:
+					"Validate image references in articles (checks if referenced images exist)",
 			},
 			args: {
 				verbose: {
@@ -152,7 +153,8 @@ export default defineCommand({
 
 		"alt-text": defineCommand({
 			meta: {
-				description: "Find missing alt text in article images",
+				description:
+					"Check image alt text quality in articles (missing, empty, or generic)",
 			},
 			args: {
 				verbose: {

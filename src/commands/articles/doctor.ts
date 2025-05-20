@@ -5,6 +5,7 @@ import { extractFrontmatter } from "../../utils/frontmatter";
 import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
 import type { ProjectPaths } from "../../utils/project";
+import { articleSchema } from "../../schemas"; // Import the schema for validation
 
 export async function doctorArticles(opts: {
 	verbose?: boolean;
@@ -98,6 +99,21 @@ export async function doctorArticles(opts: {
 				isFixable || (missing.length === 1 && missing[0] === "locale"); // Only locale is auto-fixable
 		}
 
+		// Validate against schema
+		try {
+			articleSchema.parse(frontmatter);
+		} catch (validationError: any) {
+			// If there are schema validation errors not already caught by our manual checks
+			if (validationError.errors) {
+				for (const error of validationError.errors) {
+					// Only add errors that weren't already caught by our manual check
+					if (!missing.includes(error.path[0])) {
+						fileIssues.push(`Schema validation error: ${error.message} at ${error.path.join('.')}`);
+					}
+				}
+			}
+		}
+
 		// Check author reference
 		if (frontmatter.author && authorFiles.length > 0) {
 			if (!authorFiles.includes(String(frontmatter.author))) {
@@ -146,7 +162,7 @@ export async function doctorArticles(opts: {
 						);
 						isFixable = true; // Image optimization is fixable
 					}
-				} catch (error) {
+				} catch (_) {
 					// Ignore stat errors
 				}
 			}
@@ -182,6 +198,14 @@ export async function doctorArticles(opts: {
 					fileIssues.push(`Broken image link in content: ${url}`);
 				}
 			}
+		}
+
+		// Schema validation
+		const validationResult = articleSchema.safeParse(frontmatter);
+		if (!validationResult.success) {
+			fileIssues.push(
+				`Schema validation failed: ${validationResult.error.message}`,
+			);
 		}
 
 		if (fileIssues.length > 0) {

@@ -5,6 +5,16 @@ import fs from "fs-extra";
 import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
 
+// Interface for alt text issues
+interface AltTextIssue {
+  article: string;
+  image: string;
+  line: number;
+  context: string;
+  issue: 'missing' | 'empty' | 'too_short' | 'too_generic';
+  alt?: string;
+}
+
 export async function suggestMissingAltText(opts: {
 	verbose?: boolean;
 	fix?: boolean;
@@ -36,9 +46,8 @@ export async function suggestMissingAltText(opts: {
 	let articleFiles: string[];
 
 	try {
-		articleFiles = (await fs.readdir(articlesDir)).filter((file) =>
-			file.endsWith(".md"),
-		);
+		// Get files recursively to include subdirectories
+		articleFiles = await getMarkdownFiles(articlesDir);
 	} catch (error) {
 		logger.spinnerError(
 			`Failed to read articles directory: ${(error as Error).message}`,
@@ -51,13 +60,8 @@ export async function suggestMissingAltText(opts: {
 		return;
 	}
 
-	// Track images with missing alt text
-	const missingAltText: Array<{
-		article: string;
-		image: string;
-		line: number;
-		context: string;
-	}> = [];
+	// Track images with alt text issues
+	const altTextIssues: AltTextIssue[] = [];
 
 	// Check each article
 	spinner.text = "Analyzing image alt text in articles";
@@ -81,19 +85,50 @@ export async function suggestMissingAltText(opts: {
 				for (const match of imageMatches) {
 					const alt = match[1];
 					const image = match[2];
+					
+					// Get context (the surrounding text)
+					const startLine = Math.max(0, i - 2);
+					const endLine = Math.min(lines.length - 1, i + 2);
+					const context = lines.slice(startLine, endLine + 1).join("\n");
 
-					// Check for missing or empty alt text
-					if (!alt || alt.trim() === "") {
-						// Get context (the surrounding text)
-						const startLine = Math.max(0, i - 1);
-						const endLine = Math.min(lines.length - 1, i + 1);
-						const context = lines.slice(startLine, endLine + 1).join("\n");
-
-						missingAltText.push({
+					// Check different alt text issues
+					if (!alt) {
+						// Missing alt text
+						altTextIssues.push({
 							article: articleFile,
 							image,
 							line: i + 1,
 							context,
+							issue: 'missing'
+						});
+					} else if (alt.trim() === "") {
+						// Empty alt text
+						altTextIssues.push({
+							article: articleFile,
+							image,
+							line: i + 1,
+							context,
+							issue: 'empty'
+						});
+					} else if (alt.trim().length < 5) {
+						// Too short alt text
+						altTextIssues.push({
+							article: articleFile,
+							image,
+							line: i + 1,
+							context,
+							issue: 'too_short',
+							alt: alt.trim()
+						});
+					} else if (isGenericAltText(alt.trim())) {
+						// Generic alt text
+						altTextIssues.push({
+							article: articleFile,
+							image,
+							line: i + 1,
+							context,
+							issue: 'too_generic',
+							alt: alt.trim()
 						});
 					}
 				}
@@ -112,10 +147,10 @@ export async function suggestMissingAltText(opts: {
 	spinner.stop();
 
 	// Display results
-	if (missingAltText.length === 0) {
+	if (altTextIssues.length === 0) {
 		console.log(
 			chalk.green(
-				`\nAll images in ${articleFiles.length} articles have alt text! 🎉`,
+				`\nAll images in ${articleFiles.length} articles have good alt text! 🎉`,
 			),
 		);
 		return { missing: [], total: articleFiles.length };
@@ -123,7 +158,7 @@ export async function suggestMissingAltText(opts: {
 
 	console.log(
 		chalk.yellow(
-			`\nFound ${missingAltText.length} images with missing alt text:\n`,
+			`\nFound ${altTextIssues.length} images with alt text issues:\n`,
 		),
 	);
 
@@ -131,39 +166,44 @@ export async function suggestMissingAltText(opts: {
 	const table = new Table({
 		head: [
 			chalk.cyan("Article"),
-			chalk.cyan("Image"),
+			chalk.cyan("Issue"),
+			chalk.cyan("Current Alt"),
 			chalk.cyan("Line"),
-			chalk.cyan("Context"),
 		],
 		style: {
 			head: [],
 			border: [],
 		},
-		colWidths: [30, 30, 10, 50],
+		colWidths: [30, 20, 30, 10],
 		wordWrap: true,
 	});
 
-	for (const item of missingAltText) {
-		// Simplify paths for display
-		const imageName = path.basename(item.image);
-
-		// Truncate context if it's too long
-		let context = item.context;
-		if (context.length > 100) {
-			context = `${context.substring(0, 97)}...`;
+	for (const item of altTextIssues) {
+		// Format issue type
+		let issueType;
+		switch (item.issue) {
+			case 'missing': issueType = 'Missing'; break;
+			case 'empty': issueType = 'Empty'; break;
+			case 'too_short': issueType = 'Too short'; break;
+			case 'too_generic': issueType = 'Too generic'; break;
 		}
 
-		table.push([item.article, imageName, String(item.line), context]);
+		table.push([
+			item.article, 
+			issueType, 
+			item.alt || '(none)', 
+			String(item.line)
+		]);
 	}
 
 	console.log(table.toString());
 
 	// Offer suggestions for fixing
 	if (opts.fix) {
-		spinner.start("Attempting to fix missing alt text");
+		spinner.start("Attempting to fix alt text issues");
 
 		// Auto-fixing not implemented yet
-		spinner.info("Automatic fixing of missing alt text is not implemented yet");
+		spinner.info("Automatic fixing of alt text issues is not implemented yet");
 	}
 
 	// Suggestions for adding good alt text
@@ -171,10 +211,57 @@ export async function suggestMissingAltText(opts: {
 	console.log("1. Be specific and descriptive about the image content.");
 	console.log("2. Keep it concise (around 125 characters or less).");
 	console.log(`3. Don't start with "Image of" or "Picture of".`);
-	console.log(
-		"4. Consider the context and purpose of the image in the article.",
-	);
+	console.log("4. Consider the context and purpose of the image in the article.");
 	console.log(`5. Include keywords when relevant, but don't keyword stuff.`);
 
-	return { missing: missingAltText, total: articleFiles.length };
+	return { missing: altTextIssues, total: articleFiles.length };
+}
+
+/**
+ * Recursively get all Markdown files from a directory and its subdirectories
+ */
+async function getMarkdownFiles(dir: string, base = ""): Promise<string[]> {
+	const files = await fs.readdir(dir);
+	const result: string[] = [];
+
+	for (const file of files) {
+		const filePath = path.join(dir, file);
+		const stat = await fs.stat(filePath);
+		const relativePath = base ? path.join(base, file) : file;
+
+		if (stat.isDirectory()) {
+			result.push(...await getMarkdownFiles(filePath, relativePath));
+		} else if (file.endsWith(".md")) {
+			result.push(relativePath);
+		}
+	}
+
+	return result;
+}
+
+/**
+ * Check if alt text is too generic
+ */
+function isGenericAltText(alt: string): boolean {
+	const genericPhrases = [
+		'image', 'picture', 'photo', 'screenshot', 'illustration',
+		'image of', 'picture of', 'photo of', 'screenshot of', 'illustration of',
+		'thumbnail', 'icon', 'logo', 'banner', 'graphic'
+	];
+	
+	const lowercaseAlt = alt.toLowerCase();
+	
+	// Check for single-word generic terms
+	if (genericPhrases.includes(lowercaseAlt)) {
+		return true;
+	}
+	
+	// Check for phrases that start with generic terms
+	for (const phrase of genericPhrases) {
+		if (lowercaseAlt.startsWith(phrase + ' ')) {
+			return true;
+		}
+	}
+	
+	return false;
 }

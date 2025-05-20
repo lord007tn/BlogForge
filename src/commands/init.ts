@@ -166,7 +166,7 @@ export async function initProject(opts: {
 			type: (prev: any) => (prev ? ("list" as const) : null),
 			name: "languages",
 			message: "Supported languages (comma-separated):",
-			initial: existingConfigData?.languages?.join(",") || "en,fr",
+			initial: existingConfigData?.languages?.join(",") || "en,ar",
 			separator: ",",
 		},
 		{
@@ -310,17 +310,82 @@ export async function initProject(opts: {
 		existingContent: string,
 		newCollections: Record<string, string>,
 	): string {
+		// Create a copy of the existing content for manipulation
+		let updatedContent = existingContent;
+
+		// Check if the localizedString function already exists
+		const hasLocalizedString = updatedContent.includes(
+			"const localizedString = ",
+		);
+
+		// First ensure we have the proper imports
+		if (
+			!updatedContent.includes(
+				"import { defineCollection, defineContentConfig, z } from",
+			)
+		) {
+			// If imports are missing completely, add them at the top
+			const importStatement = schemaTemplates.imports;
+			updatedContent = `${importStatement}\n\n${updatedContent}`;
+		} else if (
+			!hasLocalizedString &&
+			(updatedContent.includes("localizedString()") || answers.multilingual)
+		) {
+			// If localizedString is used but not defined, add the function definition after imports
+			const importLineRegex = /import.*from\s+['"]@nuxt\/content['"];?\s*\n/;
+			const localizedStringFunction = `
+// Helper for localized string fields
+const localizedString = (isRequired = true) => {
+  const schema = z.record(z.string(), z.string());
+  return isRequired ? schema : schema.optional();
+}`;
+
+			// Insert after the import statement
+			const match = updatedContent.match(importLineRegex);
+			if (match && typeof match.index === "number") {
+				const position = match.index + match[0].length;
+				updatedContent = `${
+					updatedContent.substring(0, position) + localizedStringFunction
+				}\n${updatedContent.substring(position)}`;
+			}
+		}
+
 		// Regex to match each CLI-managed collection block
 		const collectionNames = Object.keys(newCollections);
-		let updatedContent = existingContent;
 		for (const name of collectionNames) {
 			// Match the collection definition (e.g., articles: defineCollection({ ... })[,])
 			const regex = new RegExp(
-				`${name}:\\s*defineCollection\\([^}}]+\\)\)`,
+				`${name}:\\s*defineCollection\\([\\s\\S]*?\\}\\))`,
 				"gm",
 			);
-			updatedContent = updatedContent.replace(regex, newCollections[name]);
+
+			// If the collection exists, replace it
+			if (regex.test(updatedContent)) {
+				updatedContent = updatedContent.replace(regex, newCollections[name]);
+			} else {
+				// If the collection doesn't exist, add it to the collections object
+				const collectionsEndRegex = /collections\s*:\s*{([^}]*)}/;
+				const match = collectionsEndRegex.exec(updatedContent);
+				if (match) {
+					const collectionsContent = match[1];
+					const lastCollectionIndex = collectionsContent.lastIndexOf("}");
+					const hasTrailingComma = collectionsContent
+						.slice(lastCollectionIndex)
+						.includes(",");
+
+					// Insert the new collection with appropriate comma
+					const replacement = hasTrailingComma
+						? `collections: {${collectionsContent.slice(0, lastCollectionIndex)},\n    ${newCollections[name]}\n  }`
+						: `collections: {${collectionsContent},\n    ${newCollections[name]}\n  }`;
+
+					updatedContent = updatedContent.replace(
+						collectionsEndRegex,
+						replacement,
+					);
+				}
+			}
 		}
+
 		return updatedContent;
 	}
 
@@ -373,7 +438,16 @@ export async function initProject(opts: {
 						"\n--- content.config.ts changes (CLI-managed collections only) ---\n",
 					),
 				);
-				logger.info(patch);
+				// Print only the diff lines for better readability
+				const diffLines = patch.split("\n").slice(4); // Skip header lines
+				const formattedDiff = diffLines
+					.map((line) => {
+						if (line.startsWith("+")) return chalk.green(line);
+						if (line.startsWith("-")) return chalk.red(line);
+						return line;
+					})
+					.join("\n");
+				logger.info(formattedDiff);
 			}
 			// Ask user if they want to update
 			const updateResponse = await prompts({
@@ -395,6 +469,12 @@ export async function initProject(opts: {
 		logger.verbose(
 			`Updated content config: ${contentConfigPath}`,
 			opts.verbose || false,
+		);
+	} else if (opts.verbose) {
+		logger.info(
+			chalk.yellow(
+				"\nNo changes needed to content.config.ts - collections are up to date\n",
+			),
 		);
 	}
 

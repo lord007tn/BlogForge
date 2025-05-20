@@ -1,9 +1,9 @@
 import path from "node:path";
-import chalk from "chalk";
 import fs from "fs-extra";
 import prompts from "prompts";
 import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
+import { extractFrontmatter, getFrontMatterEntry } from "../../utils/frontmatter";
 
 export interface DeleteArticleOptions {
 	file?: string;
@@ -43,17 +43,35 @@ export async function deleteArticle(opts: DeleteArticleOptions): Promise<void> {
 	}
 
 	// If no file specified, list available articles
-	const targetFile = opts.file;
+	let targetFile = opts.file;
 	if (!targetFile) {
-		logger.spinnerWarn(
-			"Please specify a file to delete using --file <filename>.",
-		);
-
-		console.log(chalk.cyan("\nAvailable articles:"));
-		for (const f of files) {
-			console.log(`- ${f}`);
+		spinner.stop();
+		const fileOptions = [];
+		for (const file of files) {
+			const filePath = path.join(articlesDir, file);
+			const content = await fs.readFile(filePath, "utf-8");
+			const { frontmatter } = extractFrontmatter(content);
+			const title = getFrontMatterEntry(frontmatter, "title");
+			fileOptions.push({
+				title: `${title || file}`,
+				value: file,
+			});
 		}
-		return;
+
+		const response = await prompts({
+			type: "select",
+			name: "file",
+			message: "Select an article to delete:",
+			choices: fileOptions,
+		});
+
+		targetFile = response.file;
+
+		if (!targetFile) {
+			logger.error("No article selected for deletion.");
+			return;
+		}
+		spinner.start("Preparing to delete selected article");
 	}
 
 	// Verify target file exists
@@ -80,7 +98,6 @@ export async function deleteArticle(opts: DeleteArticleOptions): Promise<void> {
 	}
 
 	// Delete the file
-	const spinner2 = logger.spinner("Deleting article");
 	const filePath = path.join(articlesDir, targetFile);
 
 	try {

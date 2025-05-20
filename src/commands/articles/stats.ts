@@ -8,21 +8,20 @@ import {
 	getAllAuthors,
 	getAllCategories,
 } from "../../utils/project"; // Assuming getAllAuthors and getAllCategories are available
+import { defaultConfig } from "../../utils/config"; // Corrected import path
 
 export async function statsArticles(opts: { verbose?: boolean }) {
-	const spinner = logger.spinner("Gathering article statistics...");
+	logger.info("Gathering article statistics...");
 
 	try {
 		const articles: Article[] = await getAllArticles();
-		const authors = await getAllAuthors(); // Fetch authors for more detailed stats
-		const categories = await getAllCategories(); // Fetch categories for more detailed stats
+		const authors = await getAllAuthors(); // Added to fetch authors for name resolution
+		const categories = await getAllCategories(); // Added to fetch categories
 
 		if (!articles.length) {
 			logger.spinnerWarn("No articles found to analyze.");
 			return;
 		}
-
-		spinner.text = "Analyzing articles...";
 
 		let totalWords = 0;
 		let publishedCount = 0;
@@ -33,11 +32,7 @@ export async function statsArticles(opts: { verbose?: boolean }) {
 		const articlesByTag: Record<string, number> = {};
 
 		for (const article of articles) {
-			// const articleTitle = getTextForLocale(article.title, 'en') || article.slug || 'Untitled'; // Removed as it's unused
-			// Estimate word count from description if body is not directly available or for a quick stat
-			// For a more accurate word count, the actual content body would need to be parsed.
-			// This is a placeholder assuming 'description' might give a rough idea or if body parsing is too complex here.
-			const wordCount = (getTextForLocale(article.description, "en") || "")
+			const wordCount = (article.description || "") // article.description is now always a string
 				.split(/\s+/)
 				.filter(Boolean).length;
 			totalWords += wordCount;
@@ -73,7 +68,6 @@ export async function statsArticles(opts: { verbose?: boolean }) {
 			}
 		}
 
-		spinner.stop();
 		logger.log(chalk.bold.cyan("\n📊 Article Statistics Summary\n"));
 
 		const summaryTable = new Table();
@@ -106,12 +100,13 @@ export async function statsArticles(opts: { verbose?: boolean }) {
 				.sort(([, countA], [, countB]) => countB - countA)
 				.slice(0, 5);
 			for (const [authorId, count] of sortedAuthors) {
-				const authorName =
-					authors.find((a) => a.id === authorId)?.name || authorId;
-				const authorDisplayName =
-					getTextForLocale(authorName, "en") || authorId;
+				const author = authors.find((a) => a.slug === authorId); // Find author by slug
+				const authorName = author
+					? getTextForLocale(author.name, defaultConfig.defaultLanguage) ||
+						authorId // Use defaultConfig
+					: authorId;
 				authorTable.push([
-					authorDisplayName,
+					authorName,
 					count.toString(),
 					(wordsByAuthor[authorId] || 0).toLocaleString(),
 				]);
@@ -121,17 +116,19 @@ export async function statsArticles(opts: { verbose?: boolean }) {
 
 		// Articles per Category
 		if (Object.keys(articlesByCategory).length > 0) {
-			logger.log(chalk.bold.cyan("\n🗂️ Articles by Category (Top 5)\n"));
+			logger.log(chalk.bold.cyan("\n📚 Articles by Category (Top 5)\n"));
 			const categoryTable = new Table({
-				head: [chalk.cyan("Category Title/Slug"), chalk.cyan("Articles")],
+				head: [chalk.cyan("Category Name/Slug"), chalk.cyan("Articles")],
 			});
 			const sortedCategories = Object.entries(articlesByCategory)
 				.sort(([, countA], [, countB]) => countB - countA)
 				.slice(0, 5);
+
 			for (const [categorySlug, count] of sortedCategories) {
-				const category = categories.find((c) => c.slug === categorySlug);
+				const category = categories.find((c) => c.slug === categorySlug); // Find category by slug
 				const categoryName = category
-					? getTextForLocale(category.title, "en") || category.slug
+					? getTextForLocale(category.title, defaultConfig.defaultLanguage) ||
+						categorySlug // Use defaultConfig
 					: categorySlug;
 				categoryTable.push([categoryName, count.toString()]);
 			}
@@ -155,7 +152,6 @@ export async function statsArticles(opts: { verbose?: boolean }) {
 
 		logger.success("\nArticle statistics generated successfully.");
 	} catch (error) {
-		spinner.stop();
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		logger.error(`Error generating article statistics: ${errorMessage}`);
 	}

@@ -41,7 +41,10 @@ class Logger {
 	 * Logs an informational message
 	 */
 	info(message: string): void {
-		console.log(chalk.blue(`ℹ ${message}`));
+		// Only print the info icon if there is a message
+		if (message && message.trim().length > 0) {
+			console.log(chalk.blue(`ℹ ${message}`));
+		}
 	}
 
 	/**
@@ -71,8 +74,9 @@ class Logger {
 	box(content: string, title?: string, borderColor = "cyan"): string {
 		return boxen(content, {
 			padding: 1,
+			margin: 0,
 			borderColor: borderColor as any,
-			borderStyle: "round",
+			borderStyle: "single",
 			title,
 			titleAlignment: "center",
 		});

@@ -1,6 +1,6 @@
 import path from "node:path";
-import chalk from "chalk";
 import fs from "fs-extra";
+import prompts from "prompts";
 import { extractFrontmatter, updateFrontmatter } from "../../utils/frontmatter";
 import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
@@ -58,30 +58,35 @@ export async function unpublishArticle(opts: {
 	}
 
 	// If no file specified, list available published articles
-	const targetFile = opts.file;
+	let targetFile = opts.file;
 	if (!targetFile) {
-		logger.spinnerWarn(
-			"Please specify a published file to unpublish using --file <filename>.",
-		);
+		spinner.stop(); // Stop spinner before showing prompts
+		const response = await prompts({
+			type: "select",
+			name: "selectedFile",
+			message: "Select a published article to unpublish:",
+			choices: publishedFiles.map((f) => ({ title: f, value: f })),
+		});
 
-		console.log(chalk.cyan("\nAvailable published articles:"));
-		for (const f of publishedFiles) {
-			console.log(`- ${f}`);
+		if (!response.selectedFile) {
+			logger.info("No article selected. Aborting.");
+			return;
 		}
-		return;
+		targetFile = response.selectedFile;
+		spinner.start("Unpublishing article"); // Restart spinner
 	}
 
 	// Verify target file exists and is published
-	if (!publishedFiles.includes(targetFile)) {
+	if (!targetFile || !publishedFiles.includes(targetFile)) {
 		logger.spinnerError(
-			`File '${targetFile}' is not published or does not exist.`,
+			`File '${targetFile || ""}' is not published or does not exist.`,
 		);
 		return;
 	}
 
 	// Update the file to set draft status
 	spinner.text = "Unpublishing article";
-	const filePath = path.join(articlesDir, targetFile);
+	const filePath = path.join(articlesDir, targetFile); // targetFile is now guaranteed to be a string
 	const content = await fs.readFile(filePath, "utf-8");
 	const { frontmatter, content: _body } = extractFrontmatter(content);
 

@@ -1,7 +1,6 @@
 import { defineCommand } from "citty";
 import { createArticle } from "./create";
 import { deleteArticle } from "./delete";
-import { doctorArticles } from "./doctor";
 import { editArticle } from "./edit";
 import { listArticles } from "./list";
 import { publishArticle } from "./publish";
@@ -353,7 +352,7 @@ export default defineCommand({
 		}),
 
 		unpublish: defineCommand({
-			meta: { description: "Unpublish an article (convert to draft)" },
+			meta: { description: "Unpublish an article (mark as draft)" },
 			args: {
 				file: {
 					type: "string",
@@ -402,25 +401,24 @@ export default defineCommand({
 			},
 			run: async ({ args }) => {
 				await searchArticles({
-					query: args.query as string,
+					verbose: Boolean(args.verbose),
 					inTags: Boolean(args.inTags),
 					inContent: Boolean(args.inContent),
-					author: args.author as string | undefined,
-					verbose: Boolean(args.verbose),
+					author: args.author ? String(args.author) : undefined,
 				});
 			},
 		}),
 
 		"seo-check": defineCommand({
-			meta: { description: "Analyze articles for SEO improvements" },
+			meta: { description: "Check SEO for articles" },
 			args: {
 				keyword: {
 					type: "string",
-					description: "Main keyword to check",
+					description: "Main keyword for SEO analysis",
 				},
 				file: {
 					type: "string",
-					description: "Check specific article file",
+					description: "Specific article file to check (optional)",
 				},
 				verbose: {
 					type: "boolean",
@@ -430,31 +428,9 @@ export default defineCommand({
 			},
 			run: async ({ args }) => {
 				await seoCheck({
-					keyword: args.keyword as string | undefined,
-					file: args.file as string | undefined,
 					verbose: Boolean(args.verbose),
-				});
-			},
-		}),
-
-		validate: defineCommand({
-			meta: { description: "Validate article content and references" },
-			args: {
-				fix: {
-					type: "boolean",
-					description: "Attempt to fix issues",
-					default: false,
-				},
-				verbose: {
-					type: "boolean",
-					description: "Enable verbose logging",
-					default: false,
-				},
-			},
-			run: async ({ args }) => {
-				await validateArticles({
-					fix: Boolean(args.fix),
-					verbose: Boolean(args.verbose),
+					keyword: args.keyword ? String(args.keyword) : undefined,
+					file: args.file ? String(args.file) : undefined,
 				});
 			},
 		}),
@@ -475,12 +451,12 @@ export default defineCommand({
 			},
 		}),
 
-		doctor: defineCommand({
-			meta: { description: "Check articles for issues" },
+		validate: defineCommand({
+			meta: { description: "Validate all articles" },
 			args: {
 				fix: {
 					type: "boolean",
-					description: "Attempt to fix common issues",
+					description: "Attempt to automatically fix common issues",
 					default: false,
 				},
 				verbose: {
@@ -490,7 +466,7 @@ export default defineCommand({
 				},
 			},
 			run: async ({ args }) => {
-				await doctorArticles({
+				await validateArticles({
 					verbose: Boolean(args.verbose),
 					fix: Boolean(args.fix),
 				});

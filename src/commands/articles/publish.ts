@@ -1,6 +1,6 @@
 import path from "node:path";
-import chalk from "chalk";
 import fs from "fs-extra";
+import prompts from "prompts"; 
 import { extractFrontmatter, updateFrontmatter } from "../../utils/frontmatter";
 import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
@@ -58,30 +58,35 @@ export async function publishArticle(opts: {
 	}
 
 	// If no file specified, list available drafts
-	const targetFile = opts.file;
+	let targetFile = opts.file; 
 	if (!targetFile) {
-		logger.spinnerWarn(
-			"Please specify a draft file to publish using --file <filename>.",
-		);
+		spinner.stop(); 
+		const response = await prompts({
+			type: "select",
+			name: "selectedFile",
+			message: "Select a draft article to publish:",
+			choices: draftFiles.map((f) => ({ title: f, value: f })),
+		});
 
-		console.log(chalk.cyan("\nAvailable drafts:"));
-		for (const f of draftFiles) {
-			console.log(`- ${f}`);
+		if (!response.selectedFile) {
+			logger.info("No article selected. Aborting.");
+			return;
 		}
-		return;
+		targetFile = response.selectedFile;
+		spinner.start("Publishing article"); 
 	}
 
 	// Verify target file exists and is a draft
-	if (!draftFiles.includes(targetFile)) {
+	if (!targetFile || !draftFiles.includes(targetFile)) { // Added null check for targetFile
 		logger.spinnerError(
-			`File '${targetFile}' is not a draft or does not exist.`,
+			`File '${targetFile || ""}' is not a draft or does not exist.`,
 		);
 		return;
 	}
 
 	// Update the file to remove draft status
 	spinner.text = "Publishing article";
-	const filePath = path.join(articlesDir, targetFile);
+	const filePath = path.join(articlesDir, targetFile); // targetFile is now guaranteed to be a string
 	const content = await fs.readFile(filePath, "utf-8");
 	const { frontmatter, content: _body } = extractFrontmatter(content);
 

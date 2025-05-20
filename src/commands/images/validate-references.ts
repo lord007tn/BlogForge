@@ -42,9 +42,8 @@ export async function validateImageReferences(opts: {
 	let articleFiles: string[];
 
 	try {
-		articleFiles = (await fs.readdir(articlesDir)).filter((file) =>
-			file.endsWith(".md"),
-		);
+		// Get all markdown files, including in subdirectories
+		articleFiles = await getMarkdownFiles(articlesDir);
 	} catch (error) {
 		logger.spinnerError(
 			`Failed to read articles directory: ${(error as Error).message}`,
@@ -57,12 +56,16 @@ export async function validateImageReferences(opts: {
 		return;
 	}
 
-	// Get available images
+	// Get available images with recursive scan
 	spinner.text = "Indexing available images";
-	let availableImages: string[];
+	let availableImagePaths: string[] = [];
 
 	try {
-		availableImages = await fs.readdir(imagesDir);
+		availableImagePaths = await getAllImagePaths(imagesDir);
+		
+		if (opts.verbose) {
+			logger.info(`Found ${availableImagePaths.length} images in the images directory`);
+		}
 	} catch (error) {
 		logger.spinnerError(
 			`Failed to read images directory: ${(error as Error).message}`,
@@ -97,16 +100,18 @@ export async function validateImageReferences(opts: {
 
 			if (frontmatterMatch) {
 				const frontmatter = frontmatterMatch[1];
-				const imageMatch = frontmatter.match(/image:\s*["']?([^"'\s]+)["']?/);
+				// Get image from frontmatter, supporting both formats: 
+				// image: path.jpg
+				// image: "path.jpg"
+				// image: 'path.jpg'
+				const imageMatch = frontmatter.match(/image:\s*["']?([^"'\s,]+)["']?/);
 
 				if (imageMatch) {
 					const image = imageMatch[1];
 
 					// Only check local images, not external URLs
-					if (!image.startsWith("http")) {
-						const imageName = path.basename(image);
-
-						if (!availableImages.includes(imageName)) {
+					if (!isExternalUrl(image)) {
+						if (!isImageAvailable(image, availableImagePaths, imagesDir)) {
 							brokenReferences.push({
 								article: articleFile,
 								image,
@@ -126,10 +131,8 @@ export async function validateImageReferences(opts: {
 					const image = match[2];
 
 					// Only check local images, not external URLs
-					if (!image.startsWith("http")) {
-						const imageName = path.basename(image);
-
-						if (!availableImages.includes(imageName)) {
+					if (!isExternalUrl(image)) {
+						if (!isImageAvailable(image, availableImagePaths, imagesDir)) {
 							brokenReferences.push({
 								article: articleFile,
 								image,
@@ -212,4 +215,80 @@ export async function validateImageReferences(opts: {
 	);
 
 	return { broken: brokenReferences, total: articleFiles.length };
+}
+
+/**
+ * Recursively get all Markdown files from a directory and its subdirectories
+ */
+async function getMarkdownFiles(dir: string, base = ""): Promise<string[]> {
+	const files = await fs.readdir(dir);
+	const result: string[] = [];
+
+	for (const file of files) {
+		const filePath = path.join(dir, file);
+		const stat = await fs.stat(filePath);
+		const relativePath = base ? path.join(base, file) : file;
+
+		if (stat.isDirectory()) {
+			result.push(...await getMarkdownFiles(filePath, relativePath));
+		} else if (file.endsWith(".md")) {
+			result.push(relativePath);
+		}
+	}
+
+	return result;
+}
+
+/**
+ * Recursively get all image paths from a directory
+ */
+async function getAllImagePaths(dir: string, base = ""): Promise<string[]> {
+	const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg"];
+	const files = await fs.readdir(dir);
+	const result: string[] = [];
+
+	for (const file of files) {
+		const filePath = path.join(dir, file);
+		const stat = await fs.stat(filePath);
+		const relativePath = base ? path.join(base, file) : file;
+
+		if (stat.isDirectory()) {
+			result.push(...await getAllImagePaths(filePath, relativePath));
+		} else if (imageExtensions.some(ext => file.toLowerCase().endsWith(ext))) {
+			result.push(relativePath);
+		}
+	}
+
+	return result;
+}
+
+/**
+ * Check if a URL is external
+ */
+function isExternalUrl(url: string): boolean {
+	return url.startsWith("http:") || url.startsWith("https:") || url.startsWith("//");
+}
+
+/**
+ * Check if an image is available in the filesystem
+ */
+function isImageAvailable(imagePath: string, availableImagePaths: string[], baseImageDir: string): boolean {
+	// Remove any leading slashes or 'public/'
+	const normalizedPath = imagePath
+		.replace(/^\/+/, '')
+		.replace(/^public\//, '')
+		.replace(/^images\//, '');
+	
+	// Direct match in available paths
+	if (availableImagePaths.includes(normalizedPath)) {
+		return true;
+	}
+
+	// Check if the file exists on disk (for absolute certainty)
+	const absolutePath = path.join(baseImageDir, normalizedPath);
+	if (fs.existsSync(absolutePath)) {
+		return true;
+	}
+
+	return false;
 }

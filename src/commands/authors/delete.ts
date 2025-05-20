@@ -26,8 +26,36 @@ export async function deleteAuthor(opts: DeleteAuthorOptions): Promise<void> {
 
 	// Validate id parameter
 	if (!opts.id) {
-		logger.spinnerError("--id is required");
-		return;
+		spinner.text = "Reading author files";
+		const authorFiles = (await fs.readdir(paths.authors)).filter((f) =>
+			f.endsWith(".md"),
+		);
+
+		if (!authorFiles.length) {
+			logger.spinnerWarn("No authors to delete.");
+			return;
+		}
+
+		spinner.stop();
+		const authorOptions = authorFiles.map((file) => ({
+			title: file.replace(".md", ""),
+			value: file.replace(".md", ""),
+		}));
+
+		const response = await prompts({
+			type: "select",
+			name: "id",
+			message: "Select an author to delete:",
+			choices: authorOptions,
+		});
+
+		opts.id = response.id;
+
+		if (!opts.id) {
+			logger.error("No author selected for deletion.");
+			return;
+		}
+		spinner.start("Preparing to delete selected author");
 	}
 
 	// Check if author exists

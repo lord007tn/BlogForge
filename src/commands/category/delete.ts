@@ -29,8 +29,36 @@ export async function deleteCategory(
 
 	// Validate slug parameter
 	if (!opts.slug) {
-		logger.spinnerError("--slug is required");
-		return;
+		spinner.text = "Reading category files";
+		const categoryFiles = (await fs.readdir(paths.categories)).filter((f) =>
+			f.endsWith(".md"),
+		);
+
+		if (!categoryFiles.length) {
+			logger.spinnerWarn("No categories to delete.");
+			return;
+		}
+
+		spinner.stop();
+		const categoryOptions = categoryFiles.map((file) => ({
+			title: file.replace(".md", ""),
+			value: file.replace(".md", ""),
+		}));
+
+		const response = await prompts({
+			type: "select",
+			name: "slug",
+			message: "Select a category to delete:",
+			choices: categoryOptions,
+		});
+
+		opts.slug = response.slug;
+
+		if (!opts.slug) {
+			logger.error("No category selected for deletion.");
+			return;
+		}
+		spinner.start("Preparing to delete selected category");
 	}
 
 	// Check if category exists

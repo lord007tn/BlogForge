@@ -10,7 +10,7 @@ import {
 	articleSchema,
 	authorSchema,
 	categorySchema,
-} from "../schemas"; // Added Author and authorSchema
+} from "../schemas";
 import { type BlogForgeConfig, loadConfig } from "./config";
 import { extractFrontmatter } from "./frontmatter";
 import { logger } from "./logger";
@@ -27,7 +27,7 @@ export interface ProjectPaths {
 	config: BlogForgeConfig;
 }
 
-export const NUXT_MIN_VERSION = "^3.0.0"; // Enforce Nuxt v3 or higher
+export const NUXT_MIN_VERSION = "^3.0.0";
 
 /**
  * Enhanced project detection that supports custom content structures

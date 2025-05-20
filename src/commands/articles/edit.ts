@@ -2,6 +2,8 @@ import path from "node:path";
 import chalk from "chalk";
 import fs from "fs-extra";
 import prompts from "prompts";
+import { logger } from "../../utils/logger";
+import { type ProjectPaths, getProjectPaths } from "../../utils/project";
 import {
 	type Article,
 	articleSchema,
@@ -12,8 +14,6 @@ import {
 	getFrontMatterEntry,
 	updateFrontmatter,
 } from "../../utils/frontmatter";
-import { logger } from "../../utils/logger";
-import { type ProjectPaths, getProjectPaths } from "../../utils/project";
 
 /**
  * Interactive editor for articles that handles i18n properly
@@ -154,16 +154,15 @@ export async function editArticle(opts: {
 	// If interactive mode, show form to edit fields
 	if (
 		opts.interactive !== false &&
-		!Object.keys(opts).some((k) =>
-			[
-				"title",
-				"description",
-				"author",
-				"tags",
-				"category",
-				"isDraft",
-			].includes(k),
-		)
+		opts.title === undefined &&
+		opts.description === undefined &&
+		opts.slug === undefined &&
+		opts.author === undefined &&
+		opts.tags === undefined &&
+		opts.category === undefined &&
+		opts.isDraft === undefined &&
+		opts.publishedAt === undefined &&
+		opts.updatedAt === undefined
 	) {
 		// Get existing values
 		const currentTitle = getFrontMatterEntry(frontmatter, "title");
@@ -176,6 +175,7 @@ export async function editArticle(opts: {
 				: "";
 		const currentCategory = (frontmatter.category as string) || "";
 		const currentIsDraft = Boolean(frontmatter.idDraft);
+		const currentSlug = (frontmatter.slug as string) || "";
 
 		// Show form to edit article
 		console.log(
@@ -188,14 +188,23 @@ export async function editArticle(opts: {
 			{
 				type: "text",
 				name: "title",
-				message: "Title:",
+				message: `Title${chalk.red("(*)")}:`,
 				initial: currentTitle,
+				validate: (value) => (value ? true : "Title is required"),
 			},
 			{
 				type: "text",
 				name: "description",
-				message: "Description:",
+				message: `Description${chalk.red("(*)")}:`,
 				initial: currentDescription,
+				validate: (value) => (value ? true : "Description is required"),
+			},
+			{
+				type: "text",
+				name: "slug",
+				message: `Slug${chalk.red("(*)")}:`,
+				initial: currentSlug,
+				validate: (value) => (value ? true : "Slug is required"),
 			},
 			{
 				type: "select",
@@ -218,19 +227,13 @@ export async function editArticle(opts: {
 					{ title: "(none)", value: "" },
 					...categoryChoices.map((c) => ({ title: c, value: c })),
 				],
-				initial: categoryChoices.indexOf(currentCategory) + 1, // +1 for the "none" option
+				initial: categoryChoices.indexOf(currentCategory) + 1,
 			},
 			{
 				type: "confirm",
 				name: "isDraft",
 				message: "Is this a draft?",
 				initial: currentIsDraft,
-			},
-			{
-				type: "confirm",
-				name: "editContent",
-				message: "Would you like to edit the content?",
-				initial: false,
 			},
 		]);
 
@@ -243,46 +246,11 @@ export async function editArticle(opts: {
 		// Update opts with user input
 		opts.title = response.title;
 		opts.description = response.description;
+		opts.slug = response.slug;
 		opts.author = response.author;
 		opts.tags = response.tags;
 		opts.category = response.category;
 		opts.isDraft = response.isDraft;
-
-		// If user wants to edit content, open in their editor
-		if (response.editContent) {
-			const spawn = require("node:child_process").spawn;
-			const editor = process.env.EDITOR || "nano";
-
-			console.log(chalk.yellow(`\nOpening ${targetFile} in ${editor}...\n`));
-
-			// Create temp file with body content
-			const tempContentPath = path.join(process.cwd(), ".tmp-content");
-			await fs.writeFile(tempContentPath, bodyContent, "utf-8");
-
-			// Open editor
-			const editorProcess = spawn(editor, [tempContentPath], {
-				stdio: "inherit",
-				shell: true,
-			});
-
-			// Wait for editor to close
-			await new Promise<void>((resolve) => {
-				editorProcess.on("exit", () => {
-					resolve();
-				});
-			});
-
-			// Read updated content
-			try {
-				const newBodyContent = await fs.readFile(tempContentPath, "utf-8");
-				opts.bodyContent = newBodyContent;
-				await fs.unlink(tempContentPath);
-			} catch (error) {
-				logger.warning(
-					`Could not read edited content: ${(error as Error).message}`,
-				);
-			}
-		}
 	}
 
 	// Process updated fields
@@ -305,6 +273,10 @@ export async function editArticle(opts: {
 			opts.description as string | Record<string, string>,
 			(frontmatter.locale as string) || "en",
 		);
+	}
+
+	if (opts.slug) { // Added slug handling
+		updatedFields.slug = opts.slug as string;
 	}
 
 	if (opts.author) {
@@ -376,13 +348,15 @@ export async function editArticle(opts: {
 
 	// Update frontmatter and content
 	let newContent: string;
-	if (opts.bodyContent) {
-		// Custom body content provided, update both frontmatter and body
-		newContent = updateFrontmatter("", updatedFields) + opts.bodyContent;
-	} else {
-		// Just update frontmatter, keep existing body
-		newContent = updateFrontmatter(content, updatedFields);
-	}
+	// if (opts.bodyContent) { // This condition is now removed
+	// 	// Custom body content provided, update both frontmatter and body
+	// 	newContent = updateFrontmatter("", updatedFields) + opts.bodyContent;
+	// } else {
+	// 	// Just update frontmatter, keep existing body
+	// 	newContent = updateFrontmatter(content, updatedFields);
+	// }
+	// Always update frontmatter and keep existing body
+	newContent = updateFrontmatter(content, updatedFields);
 
 	// Write updated content to file
 	spinner2.text = "Writing updated article";

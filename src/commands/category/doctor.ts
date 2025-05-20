@@ -1,7 +1,7 @@
 import path from "node:path";
 import chalk from "chalk";
 import fs from "fs-extra";
-import { categorySchema } from "../../schemas";
+import { createCategorySchema } from "../../schemas";
 import { extractFrontmatter } from "../../utils/frontmatter";
 import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
@@ -46,6 +46,11 @@ export async function doctorCategories(opts: {
 	let issueCount = 0;
 	let fixedCount = 0;
 	const issues: { file: string; messages: string[]; fixable: boolean }[] = [];
+
+	// Create a schema with the project's config
+	const categorySchema = createCategorySchema(paths.config);
+	const isMultilingual = paths.config.multilingual;
+	const supportedLanguages = paths.config.languages || ['en'];
 
 	// Check each category file
 	for (const file of files) {
@@ -114,14 +119,42 @@ export async function doctorCategories(opts: {
 				}
 			}
 
-			// Check multilingual fields format
-			for (const field of ["title", "description"]) {
-				if (frontmatter[field] && typeof frontmatter[field] === "object") {
-					const obj = frontmatter[field] as Record<string, unknown>;
+			// Check multilingual fields format based on config
+			if (isMultilingual) {
+				for (const field of ["title", "description"]) {
+					if (frontmatter[field]) {
+						// If multilingual is enabled, fields should be objects
+						if (typeof frontmatter[field] !== "object") {
+							fileIssues.push(
+								`${field} should be a multilingual object but is a string. Config has multilingual=true.`,
+							);
+						} else if (
+							frontmatter[field] &&
+							typeof frontmatter[field] === "object"
+						) {
+							const obj = frontmatter[field] as Record<string, unknown>;
 
-					if (!(obj.en || obj.ar)) {
+							// Check if any of the supported languages exists
+							const hasAnySupportedLanguage = supportedLanguages.some((lang) =>
+								lang in obj,
+							);
+
+							if (!hasAnySupportedLanguage) {
+								fileIssues.push(
+									`${field} is multilingual but missing any of the supported languages: ${supportedLanguages.join(
+										", ",
+									)}`,
+								);
+							}
+						}
+					}
+				}
+			} else {
+				// If multilingual is disabled, text fields should be strings
+				for (const field of ["title", "description"]) {
+					if (frontmatter[field] && typeof frontmatter[field] === "object") {
 						fileIssues.push(
-							`${field} is multilingual but missing both 'en' and 'ar' translations`,
+							`${field} is an object but config has multilingual=false. Should be a string.`,
 						);
 					}
 				}

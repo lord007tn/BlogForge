@@ -280,15 +280,18 @@ async function interactiveMainMenu(): Promise<void> {
 		description: "",
 	});
 
-	// Show subcommand menu
-	logger.info(
-		boxen(chalk.bold(commandGroupTitle), {
-			padding: 1,
-			borderColor: "cyan",
-			borderStyle: "round",
-			textAlignment: "center",
-		}),
-	);
+
+	   // Use boxen for other menus
+	   logger.info(
+		   boxen(chalk.bold(commandGroupTitle), {
+			   padding: 1,
+			   margin: 1,
+			   borderColor: "cyan",
+			   borderStyle: "round",
+			   textAlignment: "center",
+		   }),
+	   );
+
 
 	const subCommandResponse = await prompts({
 		type: "select",

@@ -179,17 +179,17 @@ export function createArticleSchema(
 	config: BlogForgeConfig,
 	userSchemas: Record<string, any> = {},
 ): z.ZodType {
-	const multilingualText = createMultilingualSchema(config);
+	// const multilingualText = createMultilingualSchema(config); // Original: allows string or object
 
 	// Start with the base schema (required fields)
 	const baseSchema = z.object({
-		title: multilingualText,
-		description: multilingualText,
+		title: z.string(), // Changed: Enforce string for article titles
+		description: z.string(), // Changed: Enforce string for article descriptions
 		author: z.string(),
 		tags: z.array(z.string()).default([]),
-		locale: z.string().default(config.defaultLanguage),
-		idDraft: z.boolean().default(config.defaultValues.article?.isDraft ?? true),
-		slug: z.string(),
+		locale: z.string().default(config.defaultLanguage), // This indicates the language of the string title/description
+		isDraft: z.boolean().default(config.defaultValues.article?.isDraft ?? true),
+		slug: z.string().optional(),
 	});
 
 	// Add standard optional fields

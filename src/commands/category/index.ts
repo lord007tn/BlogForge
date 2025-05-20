@@ -69,7 +69,7 @@ export default defineCommand({
 			args: {
 				slug: {
 					type: "string",
-					description: "Category slug (required)",
+					description: "Category slug (optional in interactive mode)",
 				},
 				"title-ar": {
 					type: "string",
@@ -100,27 +100,33 @@ export default defineCommand({
 					description: "Enable verbose logging",
 					default: false,
 				},
+				interactive: {
+					type: "boolean",
+					description: "Run in interactive mode (default: true)",
+					default: true,
+				},
 			},
 			run: async ({ args }) => {
 				await editCategory({
 					verbose: Boolean(args.verbose),
-					slug: String(args.slug),
+					slug: args.slug ? String(args.slug) : undefined,
 					title:
 						args["title-ar"] || args["title-en"]
 							? {
-									ar: String(args["title-ar"]),
-									en: String(args["title-en"]),
+									ar: args["title-ar"] ? String(args["title-ar"]) : undefined,
+									en: args["title-en"] ? String(args["title-en"]) : undefined,
 								}
 							: undefined,
 					description:
 						args["description-ar"] || args["description-en"]
 							? {
-									ar: String(args["description-ar"]),
-									en: String(args["description-en"]),
+									ar: args["description-ar"] ? String(args["description-ar"]) : undefined,
+									en: args["description-en"] ? String(args["description-en"]) : undefined,
 								}
 							: undefined,
-					image: args.image ? String(args.image) : undefined,
-					icon: args.icon ? String(args.icon) : undefined,
+					image: args.image !== undefined ? String(args.image) : undefined,
+					icon: args.icon !== undefined ? String(args.icon) : undefined,
+					interactive: args.interactive !== undefined ? Boolean(args.interactive) : true,
 				});
 			},
 		}),

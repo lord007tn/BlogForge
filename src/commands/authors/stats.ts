@@ -3,6 +3,7 @@ import Table from "cli-table3";
 import { type Author, getTextForLocale } from "../../schemas";
 import { logger } from "../../utils/logger";
 import { getAllArticles, getAllAuthors } from "../../utils/project";
+import { defaultConfig } from "../../utils/config";
 
 interface AuthorStatsOptions {
 	verbose?: boolean;
@@ -23,34 +24,22 @@ export async function statsAuthors(options: AuthorStatsOptions) {
 		const table = new Table({
 			head: [
 				chalk.cyan("Author Name"),
-				chalk.cyan("ID/Slug"),
+				chalk.cyan("Slug"),
 				chalk.cyan("Article Count"),
-				chalk.cyan("Total Words (Approx.)"),
 			],
-			colWidths: [25, 25, 15, 25],
+			colWidths: [25, 25, 15],
 		});
 
 		for (const author of authors) {
 			const authorArticles = articles.filter(
-				(article) => String(article.author) === author.id,
+				(article) => String(article.author) === author.slug,
 			);
-			let totalWordsByAuthor = 0;
-			for (const article of authorArticles) {
-				totalWordsByAuthor += (
-					getTextForLocale(article.description, "en") || ""
-				)
-					.split(/\s+/)
-					.filter(Boolean).length;
-			}
 
-			const authorName = getTextForLocale(author.name, "en") || author.id;
+			const authorName =
+				getTextForLocale(author.name, defaultConfig.defaultLanguage) ||
+				author.slug;
 
-			table.push([
-				authorName,
-				author.id,
-				authorArticles.length.toString(),
-				totalWordsByAuthor.toLocaleString(),
-			]);
+			table.push([authorName, author.slug, authorArticles.length.toString()]);
 		}
 
 		console.log(table.toString());
@@ -59,17 +48,23 @@ export async function statsAuthors(options: AuthorStatsOptions) {
 			logger.info(
 				"Verbose output for author stats could include details like articles per author, etc.",
 			);
-			// Example: List articles for each author
 			for (const author of authors) {
-				const authorName = getTextForLocale(author.name, "en") || author.id;
+				const authorName =
+					getTextForLocale(author.name, defaultConfig.defaultLanguage) ||
+					author.slug;
 				logger.info(`\nArticles by ${authorName}:`);
 				const authorArticles = articles.filter(
-					(article) => String(article.author) === author.id,
+					(article) => String(article.author) === author.slug,
 				);
 				if (authorArticles.length > 0) {
 					for (const article of authorArticles) {
 						logger.log(
-							`  - ${getTextForLocale(article.title, "en") || article.slug}`,
+							`  - ${
+								getTextForLocale(
+									article.title,
+									defaultConfig.defaultLanguage,
+								) || article.slug
+							}`,
 						);
 					}
 				} else {

@@ -83,6 +83,41 @@ This command finds unused images in the default directories and asks for confirm
 
 This command compresses and optimizes images to reduce their file size without significant loss of quality. This is crucial for website performance.
 
+The `optimize` process performs the following steps:
+1.  **Initialization**:
+    *   Sets a default width of 1200px and quality of 80 if not specified by the user via options.
+    *   Determines the image directory, defaulting to `public/images`. This can be overridden using the `--directory` option.
+    *   If the image directory doesn't exist, it attempts to create it.
+2.  **Image Discovery**:
+    *   Reads the specified directory and filters for image files (JPEG, PNG, GIF, WebP, AVIF).
+    *   If no images are found, it warns the user and exits.
+3.  **Image Processing (for each image)**:
+    *   Reads the image file.
+    *   Checks the original file size. If it's less than 10KB, it skips the image, assuming it's already small enough.
+    *   Uses the `sharp` library to process the image:
+        *   **Resizes** the image to the specified `width` (default 1200px), without enlarging it if it's already smaller. This can be controlled with the `--width` option.
+        *   **Re-encodes** the image with the specified `quality` (default 80). This can be controlled with the `--quality` option.
+            *   For JPEGs: uses `mozjpeg` for better compression.
+            *   For PNGs: uses a `compressionLevel` of 9 (this is a fixed value in the current implementation and not directly tied to the `--quality` option for PNGs, though `sharp` might interpret quality for PNGs differently, often relating to quantization).
+            *   For WebP and AVIF: applies the specified quality.
+            *   For GIFs: it only resizes to preserve animation, without re-encoding.
+        *   Unsupported formats are skipped.
+    *   Writes the optimized image buffer back to the original file path (overwriting the original).
+    *   **Calculates Savings**:
+        *   Compares the new size with the original size.
+        *   If the optimized image is smaller (`savedBytes > 0`), it records the saved bytes and increments the success count.
+        *   If the optimization doesn't result in a smaller file, it reverts the file to its original content to avoid increasing file size.
+4.  **Results**:
+    *   After processing all images, it displays a summary:
+        *   The number of successfully optimized images out of the total found.
+        *   The total space saved, formatted in bytes, KB, or MB.
+    *   If `verbose` mode is enabled (using the `--verbose` flag), it logs details for each file:
+        *   Success: `✓ image.jpg: X% smaller (OriginalKB → NewKB)`
+        *   No improvement: `⚠ image.png: no improvements (kept original)`
+        *   Error: `✖ image.gif: error message`
+
+In essence, the `optimize` command aims to reduce the file size of your images by resizing them and applying compression, while trying to maintain a good level of quality. It overwrites the original images with their optimized versions if a size reduction is achieved.
+
 **Usage:**
 
 ```bash

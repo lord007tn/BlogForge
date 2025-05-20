@@ -164,7 +164,13 @@ export const ContentSchemaTemplates = (
 	multilingual: boolean,
 	defaultLanguage: string,
 ) => ({
-	imports: `import { defineCollection, defineContentConfig, z } from '@nuxt/content'`,
+	imports: `import { defineCollection, defineContentConfig, z } from '@nuxt/content'
+
+// Helper for localized string fields
+const localizedString = (isRequired = true) => {
+  const schema = z.record(z.string(), z.string());
+  return isRequired ? schema : schema.optional();
+}`,
 
 	article: `articles: defineCollection({
     type: 'page',
