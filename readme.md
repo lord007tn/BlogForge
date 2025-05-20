@@ -146,7 +146,13 @@ export default {
 
 ## Documentation
 
-For detailed command documentation, see the [docs](./docs/) directory.
+For detailed command documentation, see the [docs](./docs/) directory. This includes:
+
+- [General Commands](./docs/general.md)
+- [Articles](./docs/articles.md)
+- [Authors](./docs/authors.md)
+- [Categories](./docs/category.md)
+- [Images](./docs/images.md)
 
 ## Contributing
 
@@ -187,6 +193,12 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [ ] Interactive onboarding and guided setup for new users.
 - [ ] Advanced linting and formatting for markdown and frontmatter.
 - [ ] Batch operations for bulk content management.
+
+### Nuxt Content Collection Sources Support
+
+- [ ] Support defining collection sources via glob patterns.
+- [ ] Allow configuring `include`, `exclude`, `prefix`, and `cwd` for local collection sources.
+- [ ] Enable fetching content from remote git repositories, including support for `repository`, `authToken`, and `authBasic` configurations.
 
 ### Import & Export Functionality
 
