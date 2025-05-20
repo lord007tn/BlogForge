@@ -1,2 +1,0 @@
-commit_msg_file="$1"
-exec < /dev/tty && npx cz --hook --message "$commit_msg_file" || true
