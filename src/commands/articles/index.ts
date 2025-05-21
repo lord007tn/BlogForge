@@ -83,14 +83,6 @@ export default defineCommand({
 					type: "string",
 					description: "Updated date (YYYY-MM-DD)",
 				},
-				series: {
-					type: "string",
-					description: "Series name",
-				},
-				seriesIndex: {
-					type: "string",
-					description: "Index in series",
-				},
 				canonicalURL: {
 					type: "string",
 					description: "Canonical URL",

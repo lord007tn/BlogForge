@@ -30,29 +30,6 @@ npm install -g blogforge
 # Or use with npx
 npx blogforge
 ```
-
-## Releasing a New Version
-
-This project uses [standard-version](https://github.com/conventional-changelog/standard-version) to automate versioning and changelog generation.
-
-To cut a new release:
-
-1.  Ensure all your changes are committed.
-2.  Run the release script:
-    ```bash
-    npm run release
-    ```
-    This will:
-    - Bump the version in `package.json`.
-    - Generate/update `CHANGELOG.md` based on your conventional commits.
-    - Commit these changes and create a new version tag.
-3.  Push the changes and tags to GitHub:
-    ```bash
-    git push --follow-tags origin main
-    ```
-    (Replace `main` with your default branch name if different, e.g., `master`)
-4.  Go to your [GitHub Releases page](https://github.com/lord007tn/BlogForge/releases) and draft a new release using the tag created by `standard-version`. Copy the relevant section from `CHANGELOG.md` into the release description.
-
 ## Quickstart
 
 Initialize a new project:
@@ -194,6 +171,11 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - [ ] Advanced linting and formatting for markdown and frontmatter.
 - [ ] Batch operations for bulk content management.
 - [ ] Translation helper: Integrate with translation systems and auto-translate content.
+
+### Automatic Cross-Linking Between Articles
+
+- [ ] Enable the CLI to automatically create cross-links between articles.
+- [ ] The CLI will read all articles, analyze references and related topics, and edit content to add internal links (e.g., "See also: ...") between relevant articles.
 
 ### Nuxt Content Collection Sources Support
 

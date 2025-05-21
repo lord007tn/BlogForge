@@ -1,8 +1,10 @@
 import chalk from "chalk";
 import Table from "cli-table3";
 import type { Category } from "../../schemas"; // Import Category type
+import { getTextForLocale } from "../../schemas"; // Corrected import path
 import { logger } from "../../utils/logger";
 import { getAllArticles, getAllCategories } from "../../utils/project";
+import { defaultConfig } from "../../utils/config"; // Corrected import path
 
 interface CategoryStatsOptions {
 	verbose?: boolean;
@@ -41,7 +43,8 @@ export async function statsCategory(options: CategoryStatsOptions) {
 			});
 			table.push([
 				// Handle potentially undefined title properties
-				category.title?.en || category.title?.ar || category.slug,
+				getTextForLocale(category.title, defaultConfig.defaultLanguage) ||
+					category.slug, // Corrected: Removed extra defaultConfig
 				category.slug,
 				articlesInCategory.length.toString(),
 			]);

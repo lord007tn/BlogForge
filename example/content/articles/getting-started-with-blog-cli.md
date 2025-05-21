@@ -1,10 +1,6 @@
 ---
-title:
-  en: "Getting Started with BlogForge"
-  ar: "Getting Started with BlogForge (AR)"
-description:
-  en: "Learn how to use BlogForge to manage your Nuxt Content blog"
-  ar: "Description in AR"
+title: "Getting Started with BlogForge"
+description: "Learn how to use BlogForge to manage your Nuxt Content blog"
 author: "john-doe"
 tags:
   - "nuxt"

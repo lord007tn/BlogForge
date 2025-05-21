@@ -19,8 +19,6 @@ export const ArticleCollectionTemplate = (
       isFeatured: z.boolean().default(false),
       publishedAt: z.date().optional(),
       updatedAt: z.date().optional(),
-      series: z.string().optional(),
-      seriesIndex: z.number().optional(),
       canonicalURL: z.string().optional(),
       slug: z.string().min(1)
     })

@@ -109,49 +109,57 @@ function analyzeDescription(
 	};
 }
 
+// Keyword usage analysis
 function analyzeKeywordUsage(
 	content: string,
 	keyword: string,
 ): {
-	density: string;
+	presentInContent: boolean;
+	presentEarly: boolean;
 	recommendation: string;
 	score: number;
-	inFirstParagraph: boolean;
 	pass: boolean;
 } {
-	if (!keyword)
+	if (!keyword) {
 		return {
-			density: "0",
-			recommendation: "No keyword provided.",
-			score: 0,
-			inFirstParagraph: false,
-			pass: false,
+			presentInContent: false,
+			presentEarly: false,
+			recommendation: "No keyword provided for analysis.",
+			score: 1, // Pass if no keyword is targeted
+			pass: true,
 		};
-	const words = content.split(/\s+/g).filter(Boolean).length;
-	const count = (content.match(new RegExp(keyword, "gi")) || []).length;
-	const density = words ? (count / words) * 100 : 0;
-	const firstParagraph = content.split(/\n\n+/)[0] || "";
-	const inFirstParagraph = checkKeywordInText(firstParagraph, keyword);
-	let recommendation = "";
-	let score = 0;
-	if (density < 0.5) {
-		recommendation =
-			"Keyword density is low. Consider using the main keyword more.";
-	} else if (density > 2.5) {
-		recommendation = "Keyword density is high. Avoid keyword stuffing.";
-	} else if (!inFirstParagraph) {
-		recommendation = "Add the main keyword to the first paragraph.";
-		score = 0.5;
-	} else {
-		recommendation =
-			"Keyword density is optimal and present in first paragraph.";
-		score = 1;
 	}
+
+	const presentInContent = checkKeywordInText(content, keyword);
+	// Check in the first ~100 words for early presence
+	const firstParagraphApproximation = content
+		.split(/\s+/)
+		.slice(0, 100)
+		.join(" ");
+	const presentEarly = checkKeywordInText(firstParagraphApproximation, keyword);
+
+	let score = 0;
+	let recommendation = "";
+
+	if (presentInContent && presentEarly) {
+		score = 1;
+		recommendation =
+			"Keyword is present in the content and appears early. Good.";
+	} else if (presentInContent) {
+		score = 0.7;
+		recommendation =
+			"Keyword is present in the content, but consider placing it earlier for better prominence.";
+	} else {
+		score = 0;
+		recommendation =
+			"Keyword not found in the content. Ensure the main keyword is naturally integrated.";
+	}
+
 	return {
-		density: density.toFixed(2),
+		presentInContent,
+		presentEarly,
 		recommendation,
 		score,
-		inFirstParagraph,
 		pass: score === 1,
 	};
 }
@@ -312,8 +320,9 @@ function analyzeLinks(content: string): {
 	recommendation: string;
 	score: number;
 } {
-	// Remove unnecessary escape for '/'
-	const internal = (content.match(/\]\(\/?[\w\-\/]+\)/g) || []).length;
+	// Corrected regex for internal links
+	const internal = (content.match(/\]\(\/?(?:[\w-]+\/)*[\w-]+\)/g) || [])
+		.length;
 	const external = (content.match(/\]\(https?:\/\//g) || []).length;
 	let recommendation = "";
 	let score = 1;
@@ -446,7 +455,7 @@ export async function seoCheck(opts: SeoCheckOptions) {
 		title: string;
 		scores: Record<
 			string,
-			{ score: number; recommendation: string; [key: string]: any }
+			{ score: number; recommendation: string; [key: string]: any } // Reverted to any for now, will fix specific problematic scores entries later
 		>;
 		overallScore: number;
 	}> = [];
@@ -473,6 +482,7 @@ export async function seoCheck(opts: SeoCheckOptions) {
 
 		// Collect scores from various checks
 		const scores: Record<string, any> = {
+			// Reverted to any for now
 			title: analyzeTitle(title, keyword),
 			description: analyzeDescription(description, keyword),
 			keyword: analyzeKeywordUsage(content, keyword),
@@ -549,7 +559,7 @@ export async function seoCheck(opts: SeoCheckOptions) {
 			wordWrap: false, // We'll handle wrapping manually
 			style: {
 				head: [],
-				border: [],
+				border: [], // No border to make it cleaner
 			},
 			chars: {
 				top: "═",
@@ -599,7 +609,7 @@ export async function seoCheck(opts: SeoCheckOptions) {
 			// For each line, build the row and push to the table
 			for (let i = 0; i < maxLines; i++) {
 				// Only color non-empty lines for better readability
-				const row = paddedCells.map((lines, idx) => {
+				const row = paddedCells.map((lines) => {
 					const cell = lines[i];
 					if (!cell) return "";
 					if (score === 1) return chalk.green(cell);
@@ -628,9 +638,9 @@ export async function seoCheck(opts: SeoCheckOptions) {
 		);
 		pushPrettyRow(
 			"Keyword",
-			`Density: ${result.scores.keyword.density}%, first para: ${
-				result.scores.keyword.inFirstParagraph ? "yes" : "no"
-			}`,
+			`In content: ${
+				result.scores.keyword.presentInContent ? "yes" : "no"
+			}, Early: ${result.scores.keyword.presentEarly ? "yes" : "no"}`,
 			result.scores.keyword.recommendation,
 			result.scores.keyword.score,
 		);

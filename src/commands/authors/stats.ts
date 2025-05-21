@@ -36,7 +36,7 @@ export async function statsAuthors(options: AuthorStatsOptions) {
 			);
 
 			const authorName =
-				getTextForLocale(author.name, defaultConfig.defaultLanguage) ||
+				getTextForLocale(author.name, defaultConfig.defaultLanguage) || // Corrected: Removed extra defaultConfig
 				author.slug;
 
 			table.push([authorName, author.slug, authorArticles.length.toString()]);
@@ -50,7 +50,7 @@ export async function statsAuthors(options: AuthorStatsOptions) {
 			);
 			for (const author of authors) {
 				const authorName =
-					getTextForLocale(author.name, defaultConfig.defaultLanguage) ||
+					getTextForLocale(author.name, defaultConfig.defaultLanguage) || // Corrected: Removed extra defaultConfig
 					author.slug;
 				logger.info(`\nArticles by ${authorName}:`);
 				const authorArticles = articles.filter(
@@ -60,10 +60,7 @@ export async function statsAuthors(options: AuthorStatsOptions) {
 					for (const article of authorArticles) {
 						logger.log(
 							`  - ${
-								getTextForLocale(
-									article.title,
-									defaultConfig.defaultLanguage,
-								) || article.slug
+								article.title || article.slug // article.title is now always a string
 							}`,
 						);
 					}

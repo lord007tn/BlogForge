@@ -102,8 +102,8 @@ export async function statsArticles(opts: { verbose?: boolean }) {
 			for (const [authorId, count] of sortedAuthors) {
 				const author = authors.find((a) => a.slug === authorId); // Find author by slug
 				const authorName = author
-					? getTextForLocale(author.name, defaultConfig.defaultLanguage) ||
-						authorId // Use defaultConfig
+					? getTextForLocale(author.name, defaultConfig.defaultLanguage) || // Corrected: Removed extra defaultConfig
+						authorId
 					: authorId;
 				authorTable.push([
 					authorName,
@@ -127,8 +127,8 @@ export async function statsArticles(opts: { verbose?: boolean }) {
 			for (const [categorySlug, count] of sortedCategories) {
 				const category = categories.find((c) => c.slug === categorySlug); // Find category by slug
 				const categoryName = category
-					? getTextForLocale(category.title, defaultConfig.defaultLanguage) ||
-						categorySlug // Use defaultConfig
+					? getTextForLocale(category.title, defaultConfig.defaultLanguage) || // Corrected: Removed extra defaultConfig
+						categorySlug
 					: categorySlug;
 				categoryTable.push([categoryName, count.toString()]);
 			}

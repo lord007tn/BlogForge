@@ -179,18 +179,18 @@ export function createArticleSchema(
 	config: BlogForgeConfig,
 	userSchemas: Record<string, any> = {},
 ): z.ZodType {
-	// const multilingualText = createMultilingualSchema(config); // Original: allows string or object
-
-	// Start with the base schema (required fields)
-	const baseSchema = z.object({
-		title: z.string(), // Changed: Enforce string for article titles
-		description: z.string(), // Changed: Enforce string for article descriptions
+	// Define the shape for the article. Title and description are always strings.
+	const articleShapeDefinition = {
+		title: z.string(), // Title is always a string
+		description: z.string(), // Description is always a string
 		author: z.string(),
 		tags: z.array(z.string()).default([]),
-		locale: z.string().default(config.defaultLanguage), // This indicates the language of the string title/description
+		locale: z.string().default(config.defaultLanguage), // Locale indicates the language of title/description
 		isDraft: z.boolean().default(config.defaultValues.article?.isDraft ?? true),
 		slug: z.string().optional(),
-	});
+	};
+
+	const baseSchema = z.object(articleShapeDefinition);
 
 	// Add standard optional fields
 	const standardExtensions = z.object({
@@ -276,6 +276,7 @@ export function createArticleSchema(
 		mergedSchema = mergedSchema.merge(configExtensions);
 	}
 
+	// No transform needed here as title/description are expected to be strings directly from frontmatter
 	return mergedSchema;
 }
 
@@ -286,19 +287,25 @@ export function createAuthorSchema(
 	config: BlogForgeConfig,
 	userSchemas: Record<string, any> = {},
 ): z.ZodType {
-	const multilingualText = createMultilingualSchema(config);
+	// Fallback for multilingual fields to accept string or object with string values
+	// This helps if the schema is instantiated with a config where multilingual is false,
+	// but the actual data is an object.
+	const flexibleMultilingualText = z.union([z.string(), z.record(z.string())]);
+	const optionalFlexibleMultilingualText = z
+		.union([z.string(), z.record(z.string())])
+		.optional();
 
 	// Start with the base schema
 	const baseSchema = z.object({
 		slug: z.string(),
-		name: multilingualText,
-		bio: multilingualText,
+		name: flexibleMultilingualText, // Use flexible type
+		bio: flexibleMultilingualText, // Use flexible type
 		avatar: z.string().optional(),
 		twitter: z.string().optional(),
 		github: z.string().optional(),
 		website: z.string().optional(),
 		linkedin: z.string().optional(),
-		role: multilingualText.optional(),
+		role: optionalFlexibleMultilingualText, // Use flexible type
 	});
 
 	// Merge with user schema if available
@@ -374,12 +381,13 @@ export function createCategorySchema(
 	config: BlogForgeConfig,
 	userSchemas: Record<string, any> = {},
 ): z.ZodType {
-	const multilingualText = createMultilingualSchema(config);
+	// Fallback for multilingual fields
+	const flexibleMultilingualText = z.union([z.string(), z.record(z.string())]);
 
 	// Start with the base schema
 	const baseSchema = z.object({
-		title: multilingualText,
-		description: multilingualText,
+		title: flexibleMultilingualText, // Use flexible type
+		description: flexibleMultilingualText, // Use flexible type
 		slug: z.string(),
 		image: z.string().optional(),
 		icon: z.string().optional(),

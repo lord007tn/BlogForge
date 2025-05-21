@@ -1,6 +1,7 @@
 import path from "node:path";
 import chalk from "chalk";
 import fs from "fs-extra";
+import prompts, { type InitialReturnValue } from "prompts"; // Import InitialReturnValue
 import { articleSchema, normalizeMultilingualText } from "../../schemas";
 import { updateFrontmatter } from "../../utils/frontmatter";
 import { logger } from "../../utils/logger";
@@ -8,14 +9,25 @@ import type { ProjectPaths } from "../../utils/project";
 import { getProjectPaths } from "../../utils/project";
 import type { Article } from "../../schemas";
 
-export interface CreateArticleOptions
-	extends Partial<Omit<Article, "tags" | "title" | "description">> {
+export interface CreateArticleOptions {
 	verbose?: boolean;
+	// Most fields will be prompted, so they can be optional here
 	title?: string | Record<string, string>;
 	description?: string | Record<string, string>;
-	tags?: string;
+	author?: string;
+	tags?: string; // Will be prompted as a comma-separated string
+	locale?: string;
 	filename?: string;
 	content?: string;
+	category?: string;
+	isDraft?: boolean;
+	image?: string;
+	readingTime?: number;
+	isFeatured?: boolean;
+	publishedAt?: string;
+	updatedAt?: string;
+	canonicalURL?: string;
+	slug?: string;
 }
 
 export async function createArticle(opts: CreateArticleOptions) {
@@ -34,14 +46,17 @@ export async function createArticle(opts: CreateArticleOptions) {
 	// Validate available authors
 	spinner.text = "Checking available authors";
 	const authorsDir = paths.authors;
-	let authorChoices: string[] = [];
+	let authorChoices: { title: string; value: string }[] = [];
 
 	try {
 		if (await fs.pathExists(authorsDir)) {
 			const authorFiles = await fs.readdir(authorsDir);
 			authorChoices = authorFiles
 				.filter((f) => f.endsWith(".md"))
-				.map((f) => f.replace(/\.md$/, ""));
+				.map((f) => ({
+					title: f.replace(/\.md$/, ""),
+					value: f.replace(/\.md$/, ""),
+				}));
 		}
 	} catch (error) {
 		logger.spinnerWarn(
@@ -52,121 +67,239 @@ export async function createArticle(opts: CreateArticleOptions) {
 	// Validate available categories
 	spinner.text = "Checking available categories";
 	const categoriesDir = paths.categories;
-	let categoryChoices: string[] = [];
+	let categoryChoices: { title: string; value: string }[] = [];
 
 	try {
 		if (await fs.pathExists(categoriesDir)) {
 			const categoryFiles = await fs.readdir(categoriesDir);
 			categoryChoices = categoryFiles
 				.filter((f) => f.endsWith(".md"))
-				.map((f) => f.replace(/\.md$/, ""));
+				.map((f) => ({
+					title: f.replace(/\.md$/, ""),
+					value: f.replace(/\.md$/, ""),
+				}));
 		}
 	} catch (error) {
 		logger.spinnerWarn(
 			`Could not read categories directory: ${(error as Error).message}`,
 		);
 	}
+	spinner.stop(); // Stop spinner before prompting
 
-	// Validate required fields
-	spinner.text = "Validating input parameters";
-	if (!opts.title) {
-		logger.spinnerError("--title is required");
-		return;
-	}
+	const responses = await prompts([
+		{
+			type: "text",
+			name: "title",
+			message: "Article Title:",
+			initial: (opts.title as InitialReturnValue) || "", // Cast to InitialReturnValue
+			validate: (value) => (value ? true : "Title is required"),
+		},
+		{
+			type: "text",
+			name: "description",
+			message: "Article Description:",
+			initial: (opts.description as InitialReturnValue) || "", // Cast to InitialReturnValue
+			validate: (value) => (value ? true : "Description is required"),
+		},
+		{
+			type: authorChoices.length > 0 ? "select" : "text",
+			name: "author",
+			message: "Author:",
+			choices: authorChoices,
+			initial: opts.author,
+			validate: (value) => (value ? true : "Author is required"),
+		},
+		{
+			type: "text",
+			name: "tags",
+			message: "Tags (comma-separated):",
+			initial: opts.tags || "",
+		},
+		{
+			type: "text",
+			name: "locale",
+			message: "Locale (e.g., en, ar):",
+			initial: opts.locale || "ar",
+			validate: (value) => (value ? true : "Locale is required"),
+		},
+		{
+			type: categoryChoices.length > 0 ? "select" : "text",
+			name: "category",
+			message: "Category (optional):",
+			choices: [{ title: "(none)", value: "" }, ...categoryChoices],
+			initial: opts.category || "",
+		},
+		{
+			type: "text",
+			name: "slug",
+			message:
+				"Slug (optional, will be auto-generated from title if left empty):",
+			initial: opts.slug || "",
+		},
+		{
+			type: "text",
+			name: "filename",
+			message:
+				"Filename (optional, will be auto-generated from slug or title if left empty):",
+			initial: opts.filename || "",
+		},
+		{
+			type: "confirm",
+			name: "isDraft",
+			message: "Is this a draft?",
+			initial: opts.isDraft === undefined ? true : opts.isDraft,
+		},
+		{
+			type: "text",
+			name: "image",
+			message: "Image path (optional):",
+			initial: opts.image || "",
+		},
+		{
+			type: "number",
+			name: "readingTime",
+			message: "Reading time in minutes (optional):",
+			initial: opts.readingTime,
+		},
+		{
+			type: "confirm",
+			name: "isFeatured",
+			message: "Is this a featured article?",
+			initial: opts.isFeatured === undefined ? false : opts.isFeatured,
+		},
+		{
+			type: "text",
+			name: "publishedAt",
+			message: "Publication date (YYYY-MM-DD, optional):",
+			initial: opts.publishedAt || "",
+		},
+		{
+			type: "text",
+			name: "canonicalURL",
+			message: "Canonical URL (optional):",
+			initial: opts.canonicalURL || "",
+		},
+	]);
 
-	if (!opts.description) {
-		logger.spinnerError("--description is required");
-		return;
-	}
+	// Combine opts with responses, responses take precedence
+	const articleData = { ...opts, ...responses };
 
-	if (!opts.author) {
-		logger.spinnerError("--author is required");
-		return;
-	}
+	spinner.start("Processing article data");
 
-	if (!opts.tags) {
-		logger.spinnerError("--tags is required");
-		return;
-	}
-
-	if (!opts.locale) {
-		logger.spinnerError("--locale is required");
-		return;
-	}
-
-	// Validate author exists
-	if (authorChoices.length > 0 && !authorChoices.includes(opts.author)) {
-		logger.spinnerError(
-			`Author '${opts.author}' not found. Available: ${authorChoices.join(
-				", ",
-			)}\n💡 You can list authors with 'badael blog authors list' or create one with 'badael blog authors create ...'.`,
-		);
-		console.log(
-			chalk.cyan(
-				"\n💡 Tip: Use 'badael blog authors list' to see available authors, or 'badael blog authors create <id> ...' to add a new one.",
-			),
-		);
-		return;
-	}
-
-	// Validate category exists if provided
+	// Validate author exists if not selected from a list
 	if (
-		opts.category &&
-		categoryChoices.length > 0 &&
-		!categoryChoices.includes(opts.category)
+		authorChoices.length === 0 &&
+		articleData.author &&
+		!(await fs.pathExists(path.join(authorsDir, `${articleData.author}.md`)))
 	) {
 		logger.spinnerError(
-			`Category '${opts.category}' not found. Available: ${categoryChoices.join(
-				", ",
-			)}\n💡 You can list categories with 'badael blog categories list' or create one with 'badael blog categories create ...'.`,
+			`Author '${articleData.author}' not found. Please create the author first.`,
 		);
 		console.log(
 			chalk.cyan(
-				"\n💡 Tip: Use 'badael blog categories list' to see available categories, or 'badael blog categories create <slug> ...' to add a new one.",
+				"\n💡 Tip: Use 'blogforge authors list' to see available authors, or 'blogforge authors create ...' to add a new one.",
 			),
+		);
+		return;
+	}
+	if (
+		authorChoices.length > 0 &&
+		articleData.author &&
+		!authorChoices.find((choice) => choice.value === articleData.author)
+	) {
+		logger.spinnerError(
+			`Author '${articleData.author}' not found. Available: ${authorChoices
+				.map((c) => c.value)
+				.join(
+					", ",
+				)}\n💡 You can list authors with 'blogforge authors list' or create one with 'blogforge authors create ...'.`,
+		);
+		return;
+	}
+
+	// Validate category exists if provided and not selected from a list
+	if (
+		categoryChoices.length === 0 &&
+		articleData.category &&
+		!(await fs.pathExists(
+			path.join(categoriesDir, `${articleData.category}.md`),
+		))
+	) {
+		logger.spinnerError(
+			`Category '${articleData.category}' not found. Please create the category first.`,
+		);
+		console.log(
+			chalk.cyan(
+				"\n💡 Tip: Use 'blogforge categories list' to see available categories, or 'blogforge categories create ...' to add a new one.",
+			),
+		);
+		return;
+	}
+	if (
+		categoryChoices.length > 0 &&
+		articleData.category &&
+		!categoryChoices.find((choice) => choice.value === articleData.category) &&
+		articleData.category !== "" // Allow empty category
+	) {
+		logger.spinnerError(
+			`Category '${articleData.category}' not found. Available: ${categoryChoices
+				.map((c) => c.value)
+				.join(
+					", ",
+				)}\n💡 You can list categories with 'blogforge categories list' or create one with 'blogforge categories create ...'.`,
 		);
 		return;
 	}
 
 	// Process tags
-	const tags = (opts.tags || "")
+	const tags = (articleData.tags || "")
 		.split(",")
-		.map((t) => t.trim())
+		.map((t: string) => t.trim()) // Add type for t
 		.filter(Boolean);
 
 	// Generate slug if not provided
-	const title =
-		typeof opts.title === "string"
-			? opts.title
-			: opts.title.en || opts.title.ar || Object.values(opts.title)[0] || "";
+	const titleStr =
+		typeof articleData.title === "string"
+			? articleData.title
+			: articleData.title.en ||
+				articleData.title.ar ||
+				Object.values(articleData.title)[0] ||
+				"";
 
 	const slug =
-		opts.slug ||
-		title
+		articleData.slug ||
+		titleStr
 			.toLowerCase()
 			.replace(/[^a-z0-9]+/g, "-")
 			.replace(/(^-|-$)/g, "");
 
-	const filename = opts.filename || slug;
+	const filename = articleData.filename || slug;
 
 	// Create frontmatter object
 	spinner.text = "Creating article frontmatter";
 	const frontmatterObj: Partial<Article> = {
-		title: normalizeMultilingualText(opts.title, opts.locale),
-		description: normalizeMultilingualText(opts.description, opts.locale),
-		author: opts.author,
+		title: normalizeMultilingualText(articleData.title, articleData.locale),
+		description: normalizeMultilingualText(
+			articleData.description,
+			articleData.locale,
+		),
+		author: articleData.author,
 		tags,
-		locale: opts.locale,
-		isDraft: opts.isDraft === undefined ? true : opts.isDraft, // Default to draft
-		category: opts.category || "",
-		image: opts.image || "",
-		readingTime: opts.readingTime,
-		isFeatured: opts.isFeatured === undefined ? false : opts.isFeatured,
-		publishedAt: opts.publishedAt,
-		updatedAt: opts.updatedAt || "",
-		series: opts.series || "",
-		seriesIndex: opts.seriesIndex,
-	canonicalURL: opts.canonicalURL || "",
+		locale: articleData.locale,
+		isDraft:
+			articleData.isDraft === undefined ? true : Boolean(articleData.isDraft), // Default to draft
+		category: articleData.category || "",
+		image: articleData.image || "",
+		readingTime: articleData.readingTime
+			? Number(articleData.readingTime)
+			: undefined,
+		isFeatured:
+			articleData.isFeatured === undefined
+				? false
+				: Boolean(articleData.isFeatured),
+		publishedAt: articleData.publishedAt || undefined, // Keep as undefined if empty
+		updatedAt: articleData.updatedAt || "",
+		canonicalURL: articleData.canonicalURL || "",
 		slug,
 	};
 
@@ -182,7 +315,7 @@ export async function createArticle(opts: CreateArticleOptions) {
 	}
 
 	// Create content
-	const defaultContent = `# ${title}
+	const defaultContent = `\\n# ${titleStr}
 
 Write your article here...
 
@@ -200,7 +333,8 @@ Your conclusion goes here...
 `;
 
 	const frontmatter =
-		updateFrontmatter("", frontmatterObj) + (opts.content ?? defaultContent);
+		updateFrontmatter("", frontmatterObj) +
+		(articleData.content ?? defaultContent);
 
 	// Write file
 	spinner.text = `Writing article to ${filename}.md`;
@@ -217,14 +351,14 @@ Your conclusion goes here...
 				`📝 ${chalk.green("Article successfully created!")}
 		
 ${chalk.bold("File:")} ${chalk.cyan(path.relative(process.cwd(), filePath))}
-${chalk.bold("Title:")} ${chalk.cyan(title)}
+${chalk.bold("Title:")} ${chalk.cyan(titleStr)}
 ${chalk.bold("Status:")} ${
 					frontmatterObj.isDraft
 						? chalk.yellow("Draft")
 						: chalk.green("Published")
 				}
-${chalk.bold("Author:")} ${chalk.cyan(opts.author)}
-${chalk.bold("Category:")} ${chalk.cyan(opts.category || "(none)")}
+${chalk.bold("Author:")} ${chalk.cyan(articleData.author)}
+${chalk.bold("Category:")} ${chalk.cyan(articleData.category || "(none)")}
 ${chalk.bold("Tags:")} ${chalk.cyan(tags.join(", ") || "(none)")}`,
 				"Article Details",
 				"green",
