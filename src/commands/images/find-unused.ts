@@ -4,6 +4,7 @@ import fs from "fs-extra";
 import { extractFrontmatter } from "../../utils/frontmatter";
 import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
+import { getMarkdownFiles } from "../../utils/image";
 
 export interface FindUnusedImagesOptions {
 	verbose?: boolean;
@@ -63,9 +64,7 @@ export async function findUnusedImages(opts: FindUnusedImagesOptions) {
 	spinner.text = "Finding all articles";
 	let articleFiles: string[];
 	try {
-		articleFiles = (await fs.readdir(articlesDir)).filter((file) =>
-			file.endsWith(".md"),
-		);
+		articleFiles = await getMarkdownFiles(articlesDir);
 	} catch (error) {
 		logger.spinnerError(
 			`Failed to read articles directory: ${

@@ -4,6 +4,7 @@ import Table from "cli-table3";
 import fs from "fs-extra";
 import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
+import { getMarkdownFiles } from "../../utils/image";
 
 // Interface for alt text issues
 interface AltTextIssue {
@@ -225,28 +226,6 @@ export async function suggestMissingAltText(opts: {
 	console.log(`5. Include keywords when relevant, but don't keyword stuff.`);
 
 	return { missing: altTextIssues, total: articleFiles.length };
-}
-
-/**
- * Recursively get all Markdown files from a directory and its subdirectories
- */
-async function getMarkdownFiles(dir: string, base = ""): Promise<string[]> {
-	const files = await fs.readdir(dir);
-	const result: string[] = [];
-
-	for (const file of files) {
-		const filePath = path.join(dir, file);
-		const stat = await fs.stat(filePath);
-		const relativePath = base ? path.join(base, file) : file;
-
-		if (stat.isDirectory()) {
-			result.push(...(await getMarkdownFiles(filePath, relativePath)));
-		} else if (file.endsWith(".md")) {
-			result.push(relativePath);
-		}
-	}
-
-	return result;
 }
 
 /**

@@ -6,6 +6,11 @@ import { extractFrontmatter } from "../../utils/frontmatter";
 import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
 import type { ProjectPaths } from "../../utils/project";
+import {
+	isExternalUrl,
+	isImageAvailable,
+	getAllImagePaths,
+} from "../../utils/image";
 
 export interface ValidateArticlesOptions {
 	verbose?: boolean;
@@ -100,12 +105,20 @@ export async function validateArticles(
 						errors.push(`Missing alt text for image: ${url}`);
 					}
 
-					if (!url.startsWith("http")) {
-						const imagePath = url.startsWith("/")
-							? path.join(paths.root, "public", url)
-							: path.join(paths.public, url);
-
-						if (!(await fs.pathExists(imagePath))) {
+					if (!isExternalUrl(url)) {
+						// Use getAllImagePaths and isImageAvailable for robust check
+						const availableImagePaths = await getAllImagePaths(
+							`${paths.public}/images`,
+						);
+						const availableImageSet = new Set(availableImagePaths);
+						if (
+							!isImageAvailable(
+								url,
+								availableImagePaths,
+								`${paths.public}/images`,
+								availableImageSet,
+							)
+						) {
 							errors.push(`Broken image link: ${url}`);
 						}
 					}

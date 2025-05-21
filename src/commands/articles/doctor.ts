@@ -6,6 +6,11 @@ import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
 import type { ProjectPaths } from "../../utils/project";
 import { articleSchema } from "../../schemas"; // Import the schema for validation
+import {
+	isExternalUrl,
+	isImageAvailable,
+	getAllImagePaths,
+} from "../../utils/image";
 
 export async function doctorArticles(opts: {
 	verbose?: boolean;
@@ -108,7 +113,9 @@ export async function doctorArticles(opts: {
 				for (const error of validationError.errors) {
 					// Only add errors that weren't already caught by our manual check
 					if (!missing.includes(error.path[0])) {
-						fileIssues.push(`Schema validation error: ${error.message} at ${error.path.join('.')}`);
+						fileIssues.push(
+							`Schema validation error: ${error.message} at ${error.path.join(".")}`,
+						);
 					}
 				}
 			}
@@ -140,20 +147,30 @@ export async function doctorArticles(opts: {
 		if (
 			frontmatter.image &&
 			typeof frontmatter.image === "string" &&
-			!frontmatter.image.startsWith("http")
+			!isExternalUrl(frontmatter.image)
 		) {
-			const imgPath = frontmatter.image.startsWith("/")
-				? path.join(paths.root, "public", frontmatter.image)
-				: path.join(paths.public, frontmatter.image);
-
-			if (!(await fs.pathExists(imgPath))) {
+			// Use getAllImagePaths and isImageAvailable for robust check
+			const availableImagePaths = await getAllImagePaths(
+				`${paths.public}/images`,
+			);
+			const availableImageSet = new Set(availableImagePaths);
+			if (
+				!isImageAvailable(
+					frontmatter.image,
+					availableImagePaths,
+					`${paths.public}/images`,
+					availableImageSet,
+				)
+			) {
 				fileIssues.push(`Broken featured image link: ${frontmatter.image}`);
 			} else {
 				// Check image size
 				try {
+					const imgPath = frontmatter.image.startsWith("/")
+						? path.join(paths.root, "public", frontmatter.image)
+						: path.join(paths.public, frontmatter.image);
 					const stats = await fs.stat(imgPath);
 					const sizeInKB = stats.size / 1024;
-
 					if (sizeInKB > 500) {
 						fileIssues.push(
 							`Large featured image (${Math.round(
@@ -189,12 +206,20 @@ export async function doctorArticles(opts: {
 				isFixable = true;
 			}
 
-			if (!url.startsWith("http")) {
-				const imagePath = url.startsWith("/")
-					? path.join(paths.root, "public", url)
-					: path.join(paths.public, url);
-
-				if (!(await fs.pathExists(imagePath))) {
+			if (!isExternalUrl(url)) {
+				// Use getAllImagePaths and isImageAvailable for robust check
+				const availableImagePaths = await getAllImagePaths(
+					`${paths.public}/images`,
+				);
+				const availableImageSet = new Set(availableImagePaths);
+				if (
+					!isImageAvailable(
+						url,
+						availableImagePaths,
+						`${paths.public}/images`,
+						availableImageSet,
+					)
+				) {
 					fileIssues.push(`Broken image link in content: ${url}`);
 				}
 			}
