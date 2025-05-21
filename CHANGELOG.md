@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.9](https://github.com/lord007tn/BlogForge/compare/v0.1.8...v0.1.9) (2025-05-20)
+
+
+### Bug Fixes
+
+* align article fields with schema ([274e1ec](https://github.com/lord007tn/BlogForge/commit/274e1ec37748c62fbaf60f874e160de24539d643))
+* overall command fixes ([62c720d](https://github.com/lord007tn/BlogForge/commit/62c720de2e106acf17c3e94370ccc951b8ee2e6e))
+
 ### 0.1.8 (2025-05-20)
 
 
