@@ -6,10 +6,9 @@ const localizedString = (isRequired = true) => {
   return isRequired ? schema : schema.optional();
 }
 
-
 export default defineContentConfig({
   collections: {
-      articles: defineCollection({
+    articles: defineCollection({
     type: 'page',
     source: 'articles/**',
     schema: z.object({
@@ -29,7 +28,7 @@ export default defineContentConfig({
       canonicalURL: z.string().optional(),
     })
   }),
-  authors: defineCollection({
+    authors: defineCollection({
     type: 'data',
     source: 'authors/**',
     schema: z.object({
@@ -44,7 +43,7 @@ export default defineContentConfig({
       role: localizedString().optional()
     })
   }),
-  categories: defineCollection({
+    categories: defineCollection({
     type: 'data',
     source: 'categories/**',
     schema: z.object({

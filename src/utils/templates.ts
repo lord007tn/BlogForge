@@ -27,11 +27,17 @@ export const ArticleCollectionTemplate = (
 // Template for content.config file for Nuxt Content v3
 export const ContentConfigTemplate = (
 	collections: string[],
-) => `import { defineCollection, defineContentConfig, z } from '@nuxt/content'
+) => `import { defineCollection, defineContentConfig, z } from '@nuxt/content';
+
+// Helper for localized string fields
+const localizedString = (isRequired = true) => {
+  const schema = z.record(z.string(), z.string());
+  return isRequired ? schema : schema.optional();
+};
 
 export default defineContentConfig({
   collections: {
-${collections.map((line) => `    ${line}`).join(",\n")}
+${collections.map((line) => `    ${line}`).join(",\\n")}
   }
 });
 `;

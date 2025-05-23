@@ -1,106 +1,111 @@
-name: Create and Publish Release
+name: Release CI
 
 on:
   push:
     branches:
-      - master # Change to 'main' if that's your default branch
-    # Remove the paths-ignore section completely
+      - master
+  release:
+    types: [published]
 
 jobs:
-  release:
+  build_and_test:
+    name: Build and Test
     runs-on: ubuntu-latest
-    if: github.repository == 'lord007tn/BlogForge' && !contains(github.event.head_commit.message, 'chore(release)')
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-    outputs:
-      new_tag: ${{ steps.tag_version.outputs.new_tag }}
-      release_created: ${{ steps.tag_version.outputs.release_created }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: 'package.json'
-          cache: 'npm'
+          node-version: '20.x' # Specify your project's Node.js version
+          cache: 'npm' # Cache npm dependencies
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci # Clean install of dependencies
 
-      - name: Configure Git
+      - name: Build project
+        # This step runs your build script if it exists in package.json
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-      
-      - name: Check commit type
-        id: check_commit
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=format:%s)
-          if [[ $COMMIT_MSG == fix:* || $COMMIT_MSG == feat:* || $COMMIT_MSG == feat!:* || $COMMIT_MSG == fix!:* ]]; then
-            echo "is_release_commit=true" >> $GITHUB_OUTPUT
+          if [ -n "$(node -p "require('./package.json').scripts.build")" ]; then
+            npm run build
           else
-            echo "is_release_commit=false" >> $GITHUB_OUTPUT
+            echo "No build script found in package.json, skipping build step."
           fi
-          echo "Commit message: $COMMIT_MSG"
-          echo "Is release commit: $(cat $GITHUB_OUTPUT | grep is_release_commit | cut -d= -f2)"
 
-      - name: Run standard-version
-        id: tag_version
-        if: steps.check_commit.outputs.is_release_commit == 'true'
-        run: |
-          npm run release
-          echo "release_created=true" >> $GITHUB_OUTPUT
-          NEW_TAG=$(git describe --tags --abbrev=0)
-          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
-          echo "Created new tag: $NEW_TAG"
+      - name: Run tests
+        run: npm test # Run your test suite
 
-      - name: Push changes and tags
-        if: steps.tag_version.outputs.release_created == 'true'
-        run: |
-          git push --follow-tags origin ${{ github.ref_name }}
-
-      - name: Create GitHub Release
-        if: steps.tag_version.outputs.release_created == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag_version.outputs.new_tag }}
-          name: ${{ steps.tag_version.outputs.new_tag }}
-          body_path: "CHANGELOG.md"
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  publish-npm:
-    needs: release
+  draft_release_notes:
+    name: Draft Release Notes
+    # This job runs only on pushes to the main branch
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    if: needs.release.outputs.release_created == 'true' && github.repository == 'lord007tn/BlogForge'
+    permissions:
+      contents: write # Required to create/update GitHub release drafts
+      pull-requests: write # Required if release-drafter interacts with PRs (e.g., labeling)
+    steps:
+      - name: Checkout code (full depth)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches all history for release-drafter to analyze commits
+
+      - name: Draft next release notes
+        uses: release-drafter/release-drafter@v6
+        with:
+          publish: false # Set to false to only create/update a draft. True would auto-publish (not typical for this job).
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub Actions
+
+  publish_to_npm:
+    name: Publish to npm
+    if: github.event_name == 'release' && github.event.action == 'published'
+    needs: build_and_test # Ensures build and tests pass before publishing
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # Required to checkout code and read package.json
+      id-token: write # Required for OIDC (trusted publishing) with npm
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.release.outputs.new_tag }}
-          fetch-depth: 0
-      
-      - name: Set up Node.js
+
+      - name: Set up Node.js for publishing
         uses: actions/setup-node@v4
         with:
-          node-version-file: 'package.json'
+          node-version: '20.x'
           registry-url: 'https://registry.npmjs.org/'
-      
+
       - name: Install dependencies
+        # Re-install dependencies in the clean publish environment
         run: npm ci
-      
-      - name: Build package
-        run: npm run build
-      
+
+      - name: Build project (if build artifacts are part of the package)
+        # Re-run build if necessary to ensure all distributable files are present
+        run: |
+          if [ -n "$(node -p "require('./package.json').scripts.build")" ]; then
+            npm run build
+          else
+            echo "No build script found in package.json, skipping build step for publish."
+          fi
+
+      - name: Verify version consistency
+        # Ensures the version in package.json matches the GitHub release tag
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          GIT_TAG_VERSION=${{ github.event.release.tag_name }}
+          # GitHub tags might be v1.2.3 or 1.2.3. Strip 'v' for comparison.
+          GIT_TAG_VERSION_STRIPPED=$(echo $GIT_TAG_VERSION | sed 's/^v//')
+
+          echo "Package.json version: $PKG_VERSION"
+          echo "GitHub release tag: $GIT_TAG_VERSION (stripped: $GIT_TAG_VERSION_STRIPPED)"
+
+          if [ "$PKG_VERSION" != "$GIT_TAG_VERSION_STRIPPED" ]; then
+            echo "Error: package.json version ($PKG_VERSION) does not match git tag version ($GIT_TAG_VERSION_STRIPPED)."
+            echo "Ensure package.json version is updated and matches the release tag before publishing the release."
+            exit 1
+          fi
+
       - name: Publish to npm
         run: npm publish --access public
         env:

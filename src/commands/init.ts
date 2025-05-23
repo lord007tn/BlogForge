@@ -1,41 +1,14 @@
 import path from "node:path";
 import chalk from "chalk";
-import { createPatch } from "diff";
 import fs from "fs-extra";
 import prompts from "prompts";
 import { logger } from "../utils/logger";
-import { findProjectRoot } from "../utils/project";
+import { getProjectPaths, type ProjectPaths } from "../utils/project"; // findProjectRoot removed
 import {
 	ConfigTemplate,
 	ContentSchemaTemplates,
 	SampleContentTemplates,
 } from "../utils/templates";
-
-// Helper to read and parse existing config file
-async function readExistingConfig(
-	projectRoot: string,
-	configFiles: string[],
-): Promise<any | null> {
-	for (const file of configFiles) {
-		const filePath = path.join(projectRoot, file);
-		if (await fs.pathExists(filePath)) {
-			try {
-				if (file.endsWith(".json")) {
-					return JSON.parse(await fs.readFile(filePath, "utf-8"));
-				}
-				// For .js/.ts, try to require or eval (best effort, not perfect)
-				const content = await fs.readFile(filePath, "utf-8");
-				const match = content.match(/export default (.*);/s);
-				if (match) {
-					return JSON.parse(match[1]);
-				}
-			} catch (e) {
-				// Ignore parse errors, fallback to defaults
-			}
-		}
-	}
-	return null;
-}
 
 // Helper to validate content.config.ts (basic check for required collections)
 function validateContentConfig(content: string): boolean {
@@ -47,7 +20,6 @@ function validateContentConfig(content: string): boolean {
 		content.includes("categories: defineCollection(")
 	);
 }
-import * as Diff from "diff";
 
 /**
  * Initialize a project with BlogForge configuration
@@ -59,15 +31,23 @@ export async function initProject(opts: {
 	const spinner = logger.spinner("Initializing BlogForge");
 
 	// Find Nuxt project
-	spinner.text = "Checking for Nuxt project";
-	const projectRoot = await findProjectRoot(process.cwd());
-
-	if (!projectRoot) {
+	spinner.text = "Verifying Nuxt Content project structure";
+	let projectPaths: ProjectPaths;
+	try {
+		projectPaths = await getProjectPaths(process.cwd());
+	} catch (error) {
 		logger.spinnerError(
-			"Could not find a Nuxt project. Please run this command in a Nuxt project directory.",
+			`Project verification failed: ${(error as Error).message}`,
+		);
+		logger.info(
+			"Ensure you are running this command from within a Nuxt 3 project directory with @nuxt/content installed, or that your content sources are correctly configured.",
 		);
 		return;
 	}
+	const projectRoot = projectPaths.root;
+
+	// Mutable config that will be updated by prompts
+	const interactiveConfig = JSON.parse(JSON.stringify(projectPaths.config)); // Deep clone
 
 	// Check for existing configuration
 	const configFiles = [
@@ -90,491 +70,409 @@ export async function initProject(opts: {
 		return;
 	}
 
-	// Check for content directory
-	const contentDir = path.join(projectRoot, "content");
-	let createContentDir = false;
+	// If forcing or no existing config, prompt for settings
+	if (opts.force || !existingConfig) {
+		spinner.stop(); // Stop spinner for prompts
 
-	if (!(await fs.pathExists(contentDir))) {
-		spinner.stop();
+		logger.info(chalk.blue("Configuring BlogForge project settings:"));
 
-		const contentResponse = await prompts({
+		const dirResponses = await prompts([
+			{
+				type: "text",
+				name: "articles",
+				message: `Articles directory (relative to content, default: ${interactiveConfig.directories.articles})`,
+				initial: interactiveConfig.directories.articles,
+			},
+			{
+				type: "text",
+				name: "authors",
+				message: `Authors directory (relative to content, default: ${interactiveConfig.directories.authors})`,
+				initial: interactiveConfig.directories.authors,
+			},
+			{
+				type: "text",
+				name: "categories",
+				message: `Categories directory (relative to content, default: ${interactiveConfig.directories.categories})`,
+				initial: interactiveConfig.directories.categories,
+			},
+			{
+				type: "text",
+				name: "images",
+				message: `Images directory (in public, default: ${interactiveConfig.directories.images})`,
+				initial: interactiveConfig.directories.images,
+			},
+		]);
+		interactiveConfig.directories = {
+			...interactiveConfig.directories,
+			...dirResponses,
+		};
+
+		const langResponse = await prompts({
 			type: "confirm",
-			name: "create",
-			message: "Content directory does not exist. Create it?",
-			initial: true,
-		});
-
-		if (!contentResponse.create) {
-			logger.error("Content directory is required for BlogForge to work.");
-			return;
-		}
-
-		createContentDir = true;
-		spinner.start("Setting up BlogForge");
-	}
-
-	// Ask for configuration options
-	spinner.stop();
-
-	// Read existing config if present
-	const existingConfigData = await readExistingConfig(projectRoot, configFiles);
-
-	// Ask questions to configure the blog system, using existing config as defaults if available
-	const questions = [
-		{
-			type: "select" as const,
-			name: "configFormat",
-			message: "What format do you want for your configuration file?",
-			choices: [
-				{ title: "JavaScript (blogforge.config.js)", value: "js" },
-				{ title: "TypeScript (blogforge.config.ts)", value: "ts" },
-				{ title: "JSON (blogforge.config.json)", value: "json" },
-			],
-			initial: 0,
-		},
-		{
-			type: "text" as const,
-			name: "articlesDir",
-			message: "Directory for articles (relative to content/):",
-			initial: existingConfigData?.directories?.articles || "articles",
-		},
-		{
-			type: "text" as const,
-			name: "authorsDir",
-			message: "Directory for authors (relative to content/):",
-			initial: existingConfigData?.directories?.authors || "authors",
-		},
-		{
-			type: "text" as const,
-			name: "categoriesDir",
-			message: "Directory for categories (relative to content/):",
-			initial: existingConfigData?.directories?.categories || "categories",
-		},
-		{
-			type: "text" as const,
-			name: "imagesDir",
-			message: "Directory for images (relative to public/):",
-			initial: existingConfigData?.directories?.images || "images",
-		},
-		{
-			type: "confirm" as const,
 			name: "multilingual",
 			message: "Enable multilingual support?",
-			initial: existingConfigData?.multilingual ?? false,
-		},
-		{
-			type: (prev: any) => (prev ? ("list" as const) : null),
-			name: "languages",
-			message: "Supported languages (comma-separated):",
-			initial: existingConfigData?.languages?.join(",") || "en,ar",
-			separator: ",",
-		},
-		{
-			type: (prev: any) =>
-				prev && prev.length > 0 ? ("select" as const) : null,
-			name: "defaultLanguage",
-			message: "Default language:",
-			choices: (prev: any, values: any) =>
-				values.languages.map((lang: string) => ({
+			initial: interactiveConfig.multilingual,
+		});
+		interactiveConfig.multilingual = langResponse.multilingual;
+
+		if (interactiveConfig.multilingual) {
+			const languagesResponse = await prompts([
+				{
+					type: "text",
+					name: "languages",
+					message: "Enter languages (comma-separated, e.g., en,es):",
+					initial: interactiveConfig.languages.join(","),
+					validate: (value) =>
+						value
+							.split(",")
+							.map((s: string) => s.trim())
+							.filter(Boolean).length > 0
+							? true
+							: "Please enter at least one language.",
+				},
+			]);
+			interactiveConfig.languages = languagesResponse.languages
+				.split(",")
+				.map((s: string) => s.trim())
+				.filter(Boolean);
+
+			const defaultLanguageResponse = await prompts({
+				type: "select", // Changed to select
+				name: "defaultLanguage",
+				message: "Select default language:",
+				choices: interactiveConfig.languages.map((lang: string) => ({
 					title: lang,
 					value: lang,
 				})),
-			initial: 0,
-		},
-		{
-			type: "confirm" as const,
-			name: "setupContentConfig",
-			message: "Create/update content.config.ts with blog schemas?",
+				initial: interactiveConfig.languages.includes(
+					interactiveConfig.defaultLanguage,
+				)
+					? interactiveConfig.languages.indexOf(
+							interactiveConfig.defaultLanguage,
+						)
+					: 0,
+				validate: (value) =>
+					interactiveConfig.languages.includes(value)
+						? true
+						: "Invalid selection",
+			});
+			interactiveConfig.defaultLanguage =
+				defaultLanguageResponse.defaultLanguage;
+		} else {
+			interactiveConfig.languages = ["en"];
+			interactiveConfig.defaultLanguage = "en";
+		}
+		spinner.start(); // Restart spinner
+	}
+
+	// Check for content directory and entity directories
+	// Only prompt to create local 'content' and subdirectories if no 'fs' source is explicitly defined
+	// or if the defined 'fs' source points to the default 'content' location and it doesn't exist.
+
+	let createDefaultContentStructure = false;
+	const defaultContentDir = path.join(projectRoot, "content");
+
+	if (
+		!projectPaths.hasRemoteSources &&
+		(!projectPaths.content || !(await fs.pathExists(projectPaths.content)))
+	) {
+		// If no remote sources AND (no content path defined OR defined content path doesn't exist)
+		// This implies a local-only setup is intended or possible.
+		spinner.stop();
+		const contentResponse = await prompts({
+			type: "confirm",
+			name: "value",
+			message: `The default 'content' directory does not exist at ${chalk.cyan(path.relative(process.cwd(), defaultContentDir))}. Create it now?`,
 			initial: true,
-		},
-	];
+		});
 
-	logger.info(
-		chalk.cyan(
-			"\nLet's configure your blog (existing values shown, press enter to confirm):\n",
-		),
-	);
+		if (contentResponse.value) {
+			createDefaultContentStructure = true;
+		} else {
+			logger.info(
+				"Skipping 'content' directory creation. You may need to configure your content sources manually in nuxt.config.ts or content.config.ts if you intend to use local content.",
+			);
+		}
+		spinner.start();
+	} else if (projectPaths.hasRemoteSources && !projectPaths.content) {
+		logger.info(
+			"Project uses remote content sources. Skipping local 'content' directory check for initialization.",
+		);
+	}
 
-	const answers = await prompts(questions, {
-		onCancel: () => {
-			logger.error(chalk.red("\nInitialization cancelled."));
-			process.exit(0);
-		},
-	});
+	// Create blogforge.config.ts
+	spinner.text = "Creating BlogForge configuration file";
+	const detectedConfigFormat =
+		existingConfig?.split(".").pop()?.toLowerCase() || "ts";
+	const configFormatToUse = opts.force
+		? "ts" // Default to ts if forcing
+		: ["ts", "js", "json"].includes(detectedConfigFormat)
+			? detectedConfigFormat
+			: "ts";
+	const configFileName = `blogforge.config.${configFormatToUse}`;
+	const configFilePath = path.join(projectRoot, configFileName);
 
-	// Create configuration
-	spinner.start("Creating configuration");
+	// Prepare config for blogforge.config.ts with relative root
+	const blogForgeFileConfig = JSON.parse(JSON.stringify(interactiveConfig)); // Deep clone
+	blogForgeFileConfig.root = "."; // Set root to be relative to project root
 
-	const config = {
-		directories: {
-			articles: answers.articlesDir,
-			authors: answers.authorsDir,
-			categories: answers.categoriesDir,
-			images: answers.imagesDir,
-		},
-		multilingual: answers.multilingual,
-		languages: answers.languages || ["en"],
-		defaultLanguage: answers.defaultLanguage || "en",
-		schemaExtensions: {
-			article: {},
-			author: {},
-			category: {},
-		},
-		defaultValues: {
-			article: {
-				isDraft: true,
-			},
-			author: {},
-			category: {},
-		},
-	};
-
-	// Write configuration file
-	let configFile: string;
 	let configContent: string;
-
-	switch (answers.configFormat) {
+	switch (configFormatToUse) {
 		case "ts":
-			configFile = "blogforge.config.ts";
-			configContent = ConfigTemplate(config).ts;
+			configContent = ConfigTemplate(blogForgeFileConfig).ts;
 			break;
 		case "json":
-			configFile = "blogforge.config.json";
-			configContent = ConfigTemplate(config).json;
+			configContent = ConfigTemplate(blogForgeFileConfig).json;
 			break;
+		// case "js": // Removed redundant case
 		default:
-			configFile = "blogforge.config.js";
-			configContent = ConfigTemplate(config).js;
+			configContent = ConfigTemplate(blogForgeFileConfig).js;
 			break;
 	}
 
-	const configPath = path.join(projectRoot, configFile);
-	await fs.writeFile(configPath, configContent, "utf-8");
-
-	// Create content directories if needed
-	if (createContentDir) {
-		await fs.mkdir(contentDir);
-	}
-
-	const articlesDirPath = path.join(contentDir, answers.articlesDir);
-	const authorsDirPath = path.join(contentDir, answers.authorsDir);
-	const categoriesDirPath = path.join(contentDir, answers.categoriesDir);
-	const imagesDirPath = path.join(projectRoot, "public", answers.imagesDir);
-
-	for (const dir of [
-		articlesDirPath,
-		authorsDirPath,
-		categoriesDirPath,
-		imagesDirPath,
-	]) {
-		if (!(await fs.pathExists(dir))) {
-			await fs.mkdir(dir, { recursive: true });
-			logger.verbose(
-				`Created directory: ${path.relative(projectRoot, dir)}`,
-				opts.verbose || false,
-			);
-		}
-	}
-
-	// Always check and validate content.config.ts
-	const contentConfigPath = path.join(projectRoot, "content.config.ts");
-	let existingContentConfig = "";
-	let hasExistingContentConfig = false;
-	let validContentConfig = false;
-	if (await fs.pathExists(contentConfigPath)) {
-		existingContentConfig = await fs.readFile(contentConfigPath, "utf-8");
-		hasExistingContentConfig = true;
-		validContentConfig = validateContentConfig(existingContentConfig);
-	}
-
-	// Create schema definitions
-	const schemaTemplates = ContentSchemaTemplates(
-		answers.articlesDir,
-		answers.authorsDir,
-		answers.categoriesDir,
-		answers.multilingual,
-		answers.defaultLanguage || "en",
+	await fs.writeFile(configFilePath, configContent);
+	logger.info(
+		`Created configuration file: ${chalk.cyan(path.relative(process.cwd(), configFilePath))}`,
 	);
 
-	const articleSchema = schemaTemplates.article;
-	const authorSchema = schemaTemplates.author;
-	const categorySchema = schemaTemplates.category;
-	const imports = schemaTemplates.imports;
-	const configTemplate = schemaTemplates.configTemplate;
+	// Create content.config.ts if it doesn't exist or is invalid
+	spinner.text = "Checking/Creating content.config.ts";
+	const contentConfigPath = path.join(projectRoot, "content.config.ts");
+	let contentConfigFileContent = "";
 
-	let contentConfigContent = "";
-	let shouldWriteContentConfig = false;
-
-	// Helper to replace CLI-managed collections in content.config.ts
-	function updateCliCollectionsInConfig(
-		existingContent: string,
-		newCollections: Record<string, string>,
-	): string {
-		// Create a copy of the existing content for manipulation
-		let updatedContent = existingContent;
-
-		// Check if the localizedString function already exists
-		const hasLocalizedString = updatedContent.includes(
-			"const localizedString = ",
-		);
-
-		// First ensure we have the proper imports
-		if (
-			!updatedContent.includes(
-				"import { defineCollection, defineContentConfig, z } from",
-			)
-		) {
-			// If imports are missing completely, add them at the top
-			const importStatement = schemaTemplates.imports;
-			updatedContent = `${importStatement}\n\n${updatedContent}`;
-		} else if (
-			!hasLocalizedString &&
-			(updatedContent.includes("localizedString()") || answers.multilingual)
-		) {
-			// If localizedString is used but not defined, add the function definition after imports
-			const importLineRegex = /import.*from\s+['"]@nuxt\/content['"];?\s*\n/;
-			const localizedStringFunction = `
-// Helper for localized string fields
-const localizedString = (isRequired = true) => {
-  const schema = z.record(z.string(), z.string());
-  return isRequired ? schema : schema.optional();
-}`;
-
-			// Insert after the import statement
-			const match = updatedContent.match(importLineRegex);
-			if (match && typeof match.index === "number") {
-				const position = match.index + match[0].length;
-				updatedContent = `${
-					updatedContent.substring(0, position) + localizedStringFunction
-				}\n${updatedContent.substring(position)}`;
-			}
-		}
-
-		// Regex to match each CLI-managed collection block
-		const collectionNames = Object.keys(newCollections);
-		for (const name of collectionNames) {
-			// Match the collection definition (e.g., articles: defineCollection({ ... })[,])
-			const regex = new RegExp(
-				`${name}:\\s*defineCollection\\([\\s\\S]*?\\}\\))`,
-				"gm",
-			);
-
-			// If the collection exists, replace it
-			if (regex.test(updatedContent)) {
-				updatedContent = updatedContent.replace(regex, newCollections[name]);
-			} else {
-				// If the collection doesn't exist, add it to the collections object
-				const collectionsEndRegex = /collections\s*:\s*{([^}]*)}/;
-				const match = collectionsEndRegex.exec(updatedContent);
-				if (match) {
-					const collectionsContent = match[1];
-					const lastCollectionIndex = collectionsContent.lastIndexOf("}");
-					const hasTrailingComma = collectionsContent
-						.slice(lastCollectionIndex)
-						.includes(",");
-
-					// Insert the new collection with appropriate comma
-					const replacement = hasTrailingComma
-						? `collections: {${collectionsContent.slice(0, lastCollectionIndex)},\n    ${newCollections[name]}\n  }`
-						: `collections: {${collectionsContent},\n    ${newCollections[name]}\n  }`;
-
-					updatedContent = updatedContent.replace(
-						collectionsEndRegex,
-						replacement,
-					);
-				}
-			}
-		}
-
-		return updatedContent;
+	if (await fs.pathExists(contentConfigPath)) {
+		contentConfigFileContent = await fs.readFile(contentConfigPath, "utf-8");
 	}
 
-	if (!hasExistingContentConfig || !validContentConfig) {
-		// If missing or invalid, create/fix it
-		contentConfigContent = `${imports}\n\n${configTemplate.replace(
-			"$COLLECTIONS",
-			`  ${articleSchema},\n  ${authorSchema},\n  ${categorySchema}`,
-		)}`;
-		shouldWriteContentConfig = true;
-		if (hasExistingContentConfig && !validContentConfig) {
-			logger.error(
-				chalk.red(
-					"\nExisting content.config.ts is invalid or missing required collections. Overwriting with a valid template.",
+	if (!validateContentConfig(contentConfigFileContent) || opts.force) {
+		if (opts.force && (await fs.pathExists(contentConfigPath))) {
+			logger.info(
+				`Overwriting existing ${chalk.cyan("content.config.ts")} due to --force flag.`,
+			);
+		}
+		const templates = ContentSchemaTemplates(
+			interactiveConfig.directories.articles,
+			interactiveConfig.directories.authors,
+			interactiveConfig.directories.categories,
+			interactiveConfig.multilingual,
+			interactiveConfig.defaultLanguage,
+		);
+
+		const collectionsString = [
+			templates.article,
+			templates.author,
+			templates.category,
+		].join(",\n    ");
+
+		const finalContentConfig = `${templates.imports}\n${templates.configTemplate.replace("$COLLECTIONS", collectionsString)}`;
+
+		await fs.writeFile(contentConfigPath, finalContentConfig);
+		logger.info(`Created/Updated ${chalk.cyan("content.config.ts")}`);
+	} else {
+		logger.info(
+			`${chalk.cyan("content.config.ts")} already exists and seems valid. Skipping.`,
+		);
+	}
+
+	// Create content schemas
+	spinner.text = "Creating content schemas";
+	const schemasDir = path.join(projectRoot, "server", "schemas"); // This path might need to be configurable
+	if (!(await fs.pathExists(schemasDir))) {
+		await fs.mkdirp(schemasDir);
+	}
+
+	const articleSchemaPath = path.join(schemasDir, "article.ts");
+	const authorSchemaPath = path.join(schemasDir, "author.ts");
+	const categorySchemaPath = path.join(schemasDir, "category.ts");
+
+	if (!(await fs.pathExists(articleSchemaPath)) || opts.force) {
+		await fs.writeFile(
+			articleSchemaPath,
+			ContentSchemaTemplates(
+				interactiveConfig.directories.articles, // Use interactiveConfig
+				interactiveConfig.directories.authors, // Use interactiveConfig
+				interactiveConfig.directories.categories, // Use interactiveConfig
+				interactiveConfig.multilingual, // Use interactiveConfig
+				interactiveConfig.defaultLanguage, // Use interactiveConfig
+			).article,
+		);
+		logger.info(
+			`Created schema: ${chalk.cyan(path.relative(process.cwd(), articleSchemaPath))}`,
+		);
+	}
+	if (!(await fs.pathExists(authorSchemaPath)) || opts.force) {
+		await fs.writeFile(
+			authorSchemaPath,
+			ContentSchemaTemplates(
+				interactiveConfig.directories.articles, // Use interactiveConfig
+				interactiveConfig.directories.authors, // Use interactiveConfig
+				interactiveConfig.directories.categories, // Use interactiveConfig
+				interactiveConfig.multilingual, // Use interactiveConfig
+				interactiveConfig.defaultLanguage, // Use interactiveConfig
+			).author,
+		);
+		logger.info(
+			`Created schema: ${chalk.cyan(path.relative(process.cwd(), authorSchemaPath))}`,
+		);
+	}
+	if (!(await fs.pathExists(categorySchemaPath)) || opts.force) {
+		await fs.writeFile(
+			categorySchemaPath,
+			ContentSchemaTemplates(
+				interactiveConfig.directories.articles, // Use interactiveConfig
+				interactiveConfig.directories.authors, // Use interactiveConfig
+				interactiveConfig.directories.categories, // Use interactiveConfig
+				interactiveConfig.multilingual, // Use interactiveConfig
+				interactiveConfig.defaultLanguage, // Use interactiveConfig
+			).category,
+		);
+		logger.info(
+			`Created schema: ${chalk.cyan(path.relative(process.cwd(), categorySchemaPath))}`,
+		);
+	}
+
+	// Only create default entity directories if we decided to create the default 'content' structure
+	// or if specific local fs paths for them are defined and don't exist.
+	if (createDefaultContentStructure) {
+		spinner.text =
+			"Creating default content directories (articles, authors, categories)";
+		const articlesDir =
+			projectPaths.articles || // This might need to use interactiveConfig if path logic changes
+			path.join(defaultContentDir, interactiveConfig.directories.articles); // Use interactiveConfig
+		const authorsDir =
+			projectPaths.authors || // This might need to use interactiveConfig
+			path.join(defaultContentDir, interactiveConfig.directories.authors); // Use interactiveConfig
+		const categoriesDir =
+			projectPaths.categories || // This might need to use interactiveConfig
+			path.join(defaultContentDir, interactiveConfig.directories.categories); // Use interactiveConfig
+
+		for (const dir of [articlesDir, authorsDir, categoriesDir]) {
+			if (dir && !(await fs.pathExists(dir))) {
+				// Check dir is not null
+				await fs.mkdirp(dir);
+				logger.info(`Created directory: ${path.relative(process.cwd(), dir)}`);
+			}
+		}
+	} else if (!projectPaths.hasRemoteSources) {
+		// If not creating default structure but also not remote, check configured local paths
+		for (const dir of [
+			projectPaths.articles,
+			projectPaths.authors,
+			projectPaths.categories,
+		]) {
+			if (dir && !(await fs.pathExists(dir))) {
+				await fs.mkdirp(dir);
+				logger.info(
+					`Created configured directory: ${path.relative(process.cwd(), dir)}`,
+				);
+			}
+		}
+	}
+
+	// Create sample content
+	spinner.text = "Creating sample content";
+	if (createDefaultContentStructure) {
+		// Only create sample content if we created the default structure
+		const sampleArticlePath = path.join(
+			projectPaths.articles || // This might need to use interactiveConfig
+				path.join(defaultContentDir, interactiveConfig.directories.articles), // Use interactiveConfig
+			"my-first-post.md",
+		);
+		const sampleAuthorPath = path.join(
+			projectPaths.authors || // This might need to use interactiveConfig
+				path.join(defaultContentDir, interactiveConfig.directories.authors), // Use interactiveConfig
+			"john-doe.md",
+		);
+		const sampleCategoryPath = path.join(
+			projectPaths.categories || // This might need to use interactiveConfig
+				path.join(
+					defaultContentDir,
+					interactiveConfig.directories.categories, // Use interactiveConfig
 				),
+			"technology.md",
+		);
+
+		if (!(await fs.pathExists(sampleArticlePath))) {
+			await fs.writeFile(
+				sampleArticlePath,
+				SampleContentTemplates(
+					interactiveConfig.languages, // Use interactiveConfig
+					interactiveConfig.defaultLanguage, // Use interactiveConfig
+				).article[interactiveConfig.multilingual ? "multilingual" : "default"],
+			);
+			logger.info(
+				`Created sample article: ${chalk.cyan(path.relative(process.cwd(), sampleArticlePath))}`,
+			);
+		}
+		if (!(await fs.pathExists(sampleAuthorPath))) {
+			await fs.writeFile(
+				sampleAuthorPath,
+				SampleContentTemplates(
+					interactiveConfig.languages, // Use interactiveConfig
+					interactiveConfig.defaultLanguage, // Use interactiveConfig
+				).author[interactiveConfig.multilingual ? "multilingual" : "default"],
+			);
+			logger.info(
+				`Created sample author: ${chalk.cyan(path.relative(process.cwd(), sampleAuthorPath))}`,
+			);
+		}
+		if (!(await fs.pathExists(sampleCategoryPath))) {
+			await fs.writeFile(
+				sampleCategoryPath,
+				SampleContentTemplates(
+					interactiveConfig.languages, // Use interactiveConfig
+					interactiveConfig.defaultLanguage, // Use interactiveConfig
+				).category[interactiveConfig.multilingual ? "multilingual" : "default"],
+			);
+			logger.info(
+				`Created sample category: ${chalk.cyan(path.relative(process.cwd(), sampleCategoryPath))}`,
 			);
 		}
 	} else {
-		// If valid, update only CLI-managed collections, keep user customizations
-		let baseContent = existingContentConfig;
-		if (
-			!baseContent.includes(
-				"import { defineCollection, defineContentConfig, z }",
-			)
-		) {
-			baseContent = `${imports}\n${baseContent}`;
-		}
-		// Prepare new CLI-managed collections
-		const newCollections = {
-			articles: articleSchema,
-			authors: authorSchema,
-			categories: categorySchema,
-		};
-		// Replace only CLI-managed collections
-		const mergedContent = updateCliCollectionsInConfig(
-			baseContent,
-			newCollections,
+		logger.info(
+			"Skipping sample content creation as default content structure was not created or project uses remote sources.",
 		);
-		if (baseContent !== mergedContent) {
-			const patch = createPatch(
-				"content.config.ts",
-				baseContent,
-				mergedContent,
-				"Current",
-				"Updated",
-			);
-			if (opts.verbose) {
-				logger.info(
-					chalk.yellow(
-						"\n--- content.config.ts changes (CLI-managed collections only) ---\n",
-					),
-				);
-				// Print only the diff lines for better readability
-				const diffLines = patch.split("\n").slice(4); // Skip header lines
-				const formattedDiff = diffLines
-					.map((line) => {
-						if (line.startsWith("+")) return chalk.green(line);
-						if (line.startsWith("-")) return chalk.red(line);
-						return line;
-					})
-					.join("\n");
-				logger.info(formattedDiff);
-			}
-			// Ask user if they want to update
-			const updateResponse = await prompts({
-				type: "confirm",
-				name: "update",
-				message:
-					"CLI-managed collections in content.config.ts differ from the template. Overwrite only these sections?",
-				initial: false,
-			});
-			if (updateResponse.update) {
-				contentConfigContent = mergedContent;
-				shouldWriteContentConfig = true;
+	}
+
+	// Create .gitignore entries
+	spinner.text = "Updating .gitignore";
+	const gitignorePath = path.join(projectRoot, ".gitignore");
+	const gitignoreEntries = ["# BlogForge", "/blogforge.config.json"]; // Example entries
+
+	try {
+		let gitignoreContent = "";
+		if (await fs.pathExists(gitignorePath)) {
+			gitignoreContent = await fs.readFile(gitignorePath, "utf-8");
+		}
+
+		let updatedGitignore = gitignoreContent;
+		for (const entry of gitignoreEntries) {
+			if (!gitignoreContent.includes(entry)) {
+				updatedGitignore += `\\n${entry}`;
 			}
 		}
-	}
 
-	if (shouldWriteContentConfig) {
-		await fs.writeFile(contentConfigPath, contentConfigContent, "utf-8");
-		logger.verbose(
-			`Updated content config: ${contentConfigPath}`,
-			opts.verbose || false,
-		);
-	} else if (opts.verbose) {
-		logger.info(
-			chalk.yellow(
-				"\nNo changes needed to content.config.ts - collections are up to date\n",
-			),
-		);
-	}
-
-	// Create a sample article
-	const setupSampleContent = async () => {
-		spinner.text = "Creating sample content";
-
-		// Only create samples if directories are empty
-		const articleFiles = await fs.readdir(articlesDirPath);
-		const authorFiles = await fs.readdir(authorsDirPath);
-		const categoryFiles = await fs.readdir(categoriesDirPath);
-
-		if (
-			articleFiles.length === 0 &&
-			authorFiles.length === 0 &&
-			categoryFiles.length === 0
-		) {
-			// Create sample content
-			const templates = SampleContentTemplates(
-				answers.languages || ["en"],
-				answers.defaultLanguage || "en",
-			);
-
-			// Create sample author
-			const authorContent = answers.multilingual
-				? templates.author.multilingual
-				: templates.author.default;
-
-			await fs.writeFile(
-				path.join(authorsDirPath, "john-doe.md"),
-				authorContent,
-				"utf-8",
-			);
-
-			// Create sample category
-			const categoryContent = answers.multilingual
-				? templates.category.multilingual
-				: templates.category.default;
-
-			await fs.writeFile(
-				path.join(categoriesDirPath, "technology.md"),
-				categoryContent,
-				"utf-8",
-			);
-
-			// Create sample article
-			const articleContent = answers.multilingual
-				? templates.article.multilingual
-				: templates.article.default;
-
-			await fs.writeFile(
-				path.join(articlesDirPath, "getting-started-with-blogforge.md"),
-				articleContent,
-				"utf-8",
-			);
+		if (updatedGitignore !== gitignoreContent) {
+			await fs.writeFile(gitignorePath, `${updatedGitignore.trim()}\\n`); // Use template literal
+			logger.info(`Updated ${chalk.cyan(".gitignore")}`);
 		}
-	};
-
-	// Ask to setup sample content
-	spinner.stop();
-
-	const setupSamplesResponse = await prompts({
-		type: "confirm",
-		name: "setupSamples",
-		message: "Create sample content (author, category, article)?",
-		initial: true,
-	});
-
-	if (setupSamplesResponse.setupSamples) {
-		spinner.start("Creating sample content");
-		await setupSampleContent();
+	} catch (error) {
+		logger.error(`Could not update .gitignore: ${(error as Error).message}`); // Changed to logger.error
 	}
 
-	// Complete
-	logger.spinnerSuccess(`BlogForge initialized successfully at ${projectRoot}`);
-
+	spinner.succeed(chalk.green("BlogForge initialized successfully!"));
 	logger.info(
-		chalk.green(`\nConfiguration file created: ${chalk.cyan(configFile)}`),
+		`Configuration file created at ${chalk.cyan(path.relative(process.cwd(), configFilePath))}`,
 	);
-	logger.info(
-		chalk.green(
-			`Content directories set up in: ${chalk.cyan(
-				path.relative(process.cwd(), contentDir),
-			)}`,
-		),
-	);
-
-	if (answers.setupContentConfig) {
+	if (createDefaultContentStructure) {
 		logger.info(
-			chalk.green(
-				`Content schemas defined in: ${chalk.cyan("content.config.ts")}`,
-			),
+			`Sample content and schemas created in ${chalk.cyan(path.relative(process.cwd(), defaultContentDir))} and ${chalk.cyan(path.relative(process.cwd(), schemasDir))}`,
 		);
+	} else if (
+		!projectPaths.hasRemoteSources &&
+		(projectPaths.articles || projectPaths.authors || projectPaths.categories)
+	) {
+		logger.info("Checked/created configured local content directories.");
 	}
-
-	if (setupSamplesResponse.setupSamples) {
-		logger.info(chalk.green("Sample content created"));
-	}
-
-	logger.info(
-		chalk.cyan(`\nTo get started, run: ${chalk.bold("npx blogforge")}`),
-	);
+	logger.info("You can now start using BlogForge commands.");
 }

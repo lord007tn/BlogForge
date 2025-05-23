@@ -1,8 +1,9 @@
 /**
  * blogforge Configuration
- * Generated on 5/20/2025, 7:10:52 PM
+ * Generated on 5/23/2025, 10:39:44 PM
  */
 export default {
+  "root": ".",
   "directories": {
     "articles": "articles",
     "authors": "authors",
@@ -11,8 +12,8 @@ export default {
   },
   "multilingual": true,
   "languages": [
-    "en",
-    "ar"
+    "ar",
+    "en"
   ],
   "defaultLanguage": "ar",
   "schemaExtensions": {
