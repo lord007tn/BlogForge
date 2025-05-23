@@ -1,6 +1,9 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 
+include-pre-releases: true
+commitish: master
+
 categories:
   - title: '🚀 Features'
     labels:
@@ -23,7 +26,8 @@ categories:
     labels:
       - 'breaking-change'
 
-change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-template: '- $TITLE (#$NUMBER)'
+no-changes-template: '- No changes yet'
 change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
 
 version-resolver:
@@ -63,22 +67,24 @@ exclude-labels:
   - 'wontfix'
 
 autolabeler:
+  - label: 'feature'
+    title:
+      - '/^feat(\(.+\))?\!?:.+$/i'
+  - label: 'bug'
+    title:
+      - '/^fix(\(.+\))?\!?:.+$/i'
   - label: 'documentation'
+    title:
+      - '/^docs(\(.+\))?\!?:.+$/i'
     files:
       - '*.md'
       - 'docs/**'
-  - label: 'bug'
-    branch:
-      - '/fix\/.+/'
-    title:
-      - '/fix/i'
-  - label: 'feature'
-    branch:
-      - '/feature\/.+/'
-    title:
-      - '/feat/i'
   - label: 'chore'
-    branch:
-      - '/chore\/.+/'
     title:
-      - '/chore/i'
+      - '/^chore(\(.+\))?\!?:.+$/i'
+      - '/^ci(\(.+\))?\!?:.+$/i'
+      - '/^build(\(.+\))?\!?:.+$/i'
+      - '/^refactor(\(.+\))?\!?:.+$/i'
+  - label: 'breaking-change'
+    title:
+      - '/^.+\!:.+$/i'

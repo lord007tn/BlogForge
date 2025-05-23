@@ -33,27 +33,6 @@ jobs:
             echo "No build script found in package.json, skipping build step."
           fi
 
-  draft_release_notes:
-    name: Draft Release Notes
-    # This job runs only on pushes to the master branch
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # Required to create/update GitHub release drafts
-      pull-requests: write # Required if release-drafter interacts with PRs (e.g., labeling)
-    steps:
-      - name: Checkout code (full depth)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Fetches all history for release-drafter to analyze commits
-
-      - name: Draft next release notes
-        uses: release-drafter/release-drafter@v6
-        with:
-          publish: false # Set to false to only create/update a draft. True would auto-publish (not typical for this job).
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub Actions
-
   publish_to_npm:
     name: Publish to npm
     if: github.event_name == 'release' && github.event.action == 'published'
