@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.10](https://github.com/lord007tn/BlogForge/compare/v0.1.9...v0.1.10) (2025-05-21)
+
+
+### Bug Fixes
+
+* new fixes and refactor to images ([d70558d](https://github.com/lord007tn/BlogForge/commit/d70558d4d80955593f4252f951a3d52070dee1fb))
+* universal fixes to articles, authors, category commands ([8e07ea5](https://github.com/lord007tn/BlogForge/commit/8e07ea54e014277fadfae3729f295b5b069f8c26))
+
 ### [0.1.9](https://github.com/lord007tn/BlogForge/compare/v0.1.8...v0.1.9) (2025-05-20)
 
 
