@@ -38,16 +38,23 @@ export async function editArticle(opts: {
 
 	// Verify articles directory exists
 	const articlesDir = paths.articles;
-	if (!(await fs.pathExists(articlesDir))) {
+	if (!articlesDir || !(await fs.pathExists(articlesDir))) {
 		logger.spinnerError("No articles directory found.");
 		return;
 	}
 
 	// Get list of article files
 	spinner.text = "Reading article files";
-	const files = (await fs.readdir(articlesDir)).filter((f) =>
-		f.endsWith(".md"),
-	);
+	let files: string[];
+	try {
+		const allFiles = await fs.readdir(articlesDir);
+		files = allFiles.filter((f) => f.endsWith(".md"));
+	} catch (e) {
+		logger.spinnerError(
+			`Failed to read articles directory: ${(e as Error).message}`,
+		);
+		return;
+	}
 
 	if (!files.length) {
 		logger.spinnerError("No articles found to edit.");
@@ -119,7 +126,7 @@ export async function editArticle(opts: {
 	let authorChoices: string[] = [];
 
 	try {
-		if (await fs.pathExists(authorsDir)) {
+		if (authorsDir && (await fs.pathExists(authorsDir))) {
 			const authorFiles = await fs.readdir(authorsDir);
 			authorChoices = authorFiles
 				.filter((f) => f.endsWith(".md"))
@@ -137,7 +144,7 @@ export async function editArticle(opts: {
 	let categoryChoices: string[] = [];
 
 	try {
-		if (await fs.pathExists(categoriesDir)) {
+		if (categoriesDir && (await fs.pathExists(categoriesDir))) {
 			const categoryFiles = await fs.readdir(categoriesDir);
 			categoryChoices = categoryFiles
 				.filter((f) => f.endsWith(".md"))
@@ -275,7 +282,8 @@ export async function editArticle(opts: {
 		);
 	}
 
-	if (opts.slug) { // Added slug handling
+	if (opts.slug) {
+		// Added slug handling
 		updatedFields.slug = opts.slug as string;
 	}
 

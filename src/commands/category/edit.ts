@@ -53,9 +53,20 @@ export async function editCategory(opts: {
 	let targetSlug = opts.slug;
 	if (!targetSlug && opts.interactive !== false) {
 		spinner.text = "Reading category files";
-		const categoryFiles = (await fs.readdir(categoriesDir)).filter((f) =>
-			f.endsWith(".md"),
-		);
+		let categoryFiles: string[];
+		if (categoriesDir) {
+			try {
+				const allFiles = await fs.readdir(categoriesDir);
+				categoryFiles = allFiles.filter((f) => f.endsWith(".md"));
+			} catch (e) {
+				logger.spinnerError(
+					`Failed to read categories directory: ${(e as Error).message}`,
+				);
+				return;
+			}
+		} else {
+			categoryFiles = [];
+		}
 		if (!categoryFiles.length) {
 			logger.spinnerError("No categories found to edit.");
 			return;
@@ -88,6 +99,11 @@ export async function editCategory(opts: {
 	// Ensure targetSlug is definitively clean before use
 	if (typeof targetSlug === "string" && targetSlug.endsWith(".md")) {
 		targetSlug = targetSlug.slice(0, -3);
+	}
+
+	if (!categoriesDir) {
+		logger.spinnerError("No category directory found.");
+		return;
 	}
 
 	const filePath = path.join(categoriesDir, `${targetSlug}.md`);

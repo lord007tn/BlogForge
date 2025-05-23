@@ -3,7 +3,10 @@ import fs from "fs-extra";
 import prompts from "prompts";
 import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
-import { extractFrontmatter, getFrontMatterEntry } from "../../utils/frontmatter";
+import {
+	extractFrontmatter,
+	getFrontMatterEntry,
+} from "../../utils/frontmatter";
 
 export interface DeleteArticleOptions {
 	file?: string;
@@ -18,6 +21,12 @@ export async function deleteArticle(opts: DeleteArticleOptions): Promise<void> {
 	let articlesDir: string;
 	try {
 		const paths = await getProjectPaths(process.cwd());
+		if (!paths.articles) {
+			logger.spinnerError(
+				"Articles directory not found in project configuration.",
+			);
+			return;
+		}
 		articlesDir = paths.articles;
 		spinner.text = "Checking articles directory";
 	} catch (e) {
@@ -33,9 +42,16 @@ export async function deleteArticle(opts: DeleteArticleOptions): Promise<void> {
 
 	// Get article files
 	spinner.text = "Reading article files";
-	const files = (await fs.readdir(articlesDir)).filter((f) =>
-		f.endsWith(".md"),
-	);
+	let files: string[];
+	try {
+		const allFiles = await fs.readdir(articlesDir);
+		files = allFiles.filter((f) => f.endsWith(".md"));
+	} catch (e) {
+		logger.spinnerError(
+			`Failed to read articles directory: ${(e as Error).message}`,
+		);
+		return;
+	}
 
 	if (!files.length) {
 		logger.spinnerWarn("No articles to delete.");

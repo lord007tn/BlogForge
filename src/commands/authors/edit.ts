@@ -52,14 +52,27 @@ export async function editAuthor(opts: {
 	}
 
 	const authorsDir = paths.authors; // Moved authorsDir up for early access
+	if (!authorsDir) {
+		logger.spinnerError(
+			"Authors directory is not defined in project configuration.",
+		);
+		return;
+	}
 
 	// If no id specified and interactive mode, prompt user to select one
 	let targetId = opts.id;
 	if (!targetId && opts.interactive !== false) {
 		spinner.text = "Reading author files";
-		const authorFiles = (await fs.readdir(authorsDir)).filter((f) =>
-			f.endsWith(".md"),
-		);
+		let authorFiles: string[];
+		try {
+			const allFiles = await fs.readdir(authorsDir);
+			authorFiles = allFiles.filter((f) => f.endsWith(".md"));
+		} catch (e) {
+			logger.spinnerError(
+				`Failed to read authors directory: ${(e as Error).message}`,
+			);
+			return;
+		}
 		if (!authorFiles.length) {
 			logger.spinnerError("No authors found to edit.");
 			return;

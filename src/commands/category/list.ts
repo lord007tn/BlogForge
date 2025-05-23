@@ -16,7 +16,7 @@ export async function listCategories(opts: { verbose?: boolean }) {
 	let categoriesDir: string;
 	try {
 		const paths = await getProjectPaths(process.cwd());
-		categoriesDir = paths.categories;
+		categoriesDir = paths.categories ?? "";
 		spinner.text = "Checking categories directory";
 	} catch (e) {
 		logger.spinnerError(`Project validation failed: ${(e as Error).message}`);
@@ -31,9 +31,16 @@ export async function listCategories(opts: { verbose?: boolean }) {
 
 	// Get category files
 	spinner.text = "Reading category files";
-	const files = (await fs.readdir(categoriesDir)).filter((f) =>
-		f.endsWith(".md"),
-	);
+	let files: string[];
+	try {
+		const allFiles = await fs.readdir(categoriesDir);
+		files = allFiles.filter((f) => f.endsWith(".md"));
+	} catch (e) {
+		logger.spinnerError(
+			`Failed to read categories directory: ${(e as Error).message}`,
+		);
+		return;
+	}
 
 	if (!files.length) {
 		logger.spinnerWarn("No categories found.");
@@ -65,7 +72,7 @@ export async function listCategories(opts: { verbose?: boolean }) {
 	let articlesDir: string;
 	try {
 		const paths = await getProjectPaths(process.cwd());
-		articlesDir = paths.articles;
+		articlesDir = paths.articles ?? "";
 
 		if (await fs.pathExists(articlesDir)) {
 			const articleFiles = await fs.readdir(articlesDir);

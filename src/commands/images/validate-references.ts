@@ -19,6 +19,9 @@ export async function validateImageReferences(opts: {
 
 	try {
 		const paths = await getProjectPaths(process.cwd());
+		if (!paths.articles) {
+			throw new Error("Articles directory not found in project configuration.");
+		}
 		articlesDir = paths.articles;
 		imagesDir = path.join(paths.public, "images");
 

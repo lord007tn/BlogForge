@@ -1,6 +1,6 @@
 import path from "node:path";
 import fs from "fs-extra";
-import prompts from "prompts"; 
+import prompts from "prompts";
 import { extractFrontmatter, updateFrontmatter } from "../../utils/frontmatter";
 import { logger } from "../../utils/logger";
 import { getProjectPaths } from "../../utils/project";
@@ -12,10 +12,16 @@ export async function publishArticle(opts: {
 	const spinner = logger.spinner("Initializing publish process");
 
 	// Get project paths
-	let articlesDir: string;
+	let articlesDir: string | null = null;
 	try {
 		const paths = await getProjectPaths(process.cwd());
 		articlesDir = paths.articles;
+		if (!articlesDir) {
+			logger.spinnerError(
+				"Articles directory not found in project configuration.",
+			);
+			return;
+		}
 		spinner.text = "Checking articles directory";
 	} catch (e) {
 		logger.spinnerError(`Project validation failed: ${(e as Error).message}`);
@@ -30,9 +36,16 @@ export async function publishArticle(opts: {
 
 	// Get article files
 	spinner.text = "Reading article files";
-	const files = (await fs.readdir(articlesDir)).filter((f) =>
-		f.endsWith(".md"),
-	);
+	let files: string[];
+	try {
+		const allFiles = await fs.readdir(articlesDir);
+		files = allFiles.filter((f) => f.endsWith(".md"));
+	} catch (e) {
+		logger.spinnerError(
+			`Failed to read articles directory: ${(e as Error).message}`,
+		);
+		return;
+	}
 
 	if (!files.length) {
 		logger.spinnerError("No articles found.");
@@ -58,9 +71,9 @@ export async function publishArticle(opts: {
 	}
 
 	// If no file specified, list available drafts
-	let targetFile = opts.file; 
+	let targetFile = opts.file;
 	if (!targetFile) {
-		spinner.stop(); 
+		spinner.stop();
 		const response = await prompts({
 			type: "select",
 			name: "selectedFile",
@@ -73,11 +86,12 @@ export async function publishArticle(opts: {
 			return;
 		}
 		targetFile = response.selectedFile;
-		spinner.start("Publishing article"); 
+		spinner.start("Publishing article");
 	}
 
 	// Verify target file exists and is a draft
-	if (!targetFile || !draftFiles.includes(targetFile)) { // Added null check for targetFile
+	if (!targetFile || !draftFiles.includes(targetFile)) {
+		// Added null check for targetFile
 		logger.spinnerError(
 			`File '${targetFile || ""}' is not a draft or does not exist.`,
 		);

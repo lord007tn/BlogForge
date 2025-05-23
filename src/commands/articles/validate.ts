@@ -31,8 +31,13 @@ export async function validateArticles(
 		logger.spinnerError(`Project validation failed: ${(e as Error).message}`);
 		return;
 	}
-
 	// Check if articles directory exists
+	if (!paths.articles) {
+		logger.spinnerError(
+			"Articles directory not found in project configuration.",
+		);
+		return;
+	}
 	if (!(await fs.pathExists(paths.articles))) {
 		logger.spinnerError("No articles directory found.");
 		return;
@@ -40,9 +45,16 @@ export async function validateArticles(
 
 	// Get article files
 	spinner.text = "Finding article files";
-	const files = (await fs.readdir(paths.articles)).filter((f) =>
-		f.endsWith(".md"),
-	);
+	let files: string[];
+	try {
+		const allFiles = await fs.readdir(paths.articles);
+		files = allFiles.filter((f) => f.endsWith(".md"));
+	} catch (e) {
+		logger.spinnerError(
+			`Failed to read articles directory: ${(e as Error).message}`,
+		);
+		return;
+	}
 
 	if (!files.length) {
 		logger.spinnerWarn("No articles found to validate.");
@@ -60,7 +72,12 @@ export async function validateArticles(
 	// Validate articles in parallel
 	const results = await Promise.all(
 		files.map(async (file) => {
-			const filePath = path.join(paths.articles, file);
+			const filePath = path.join(paths.articles ?? "", file);
+
+			// Check if file exists before proceeding
+			if (!(await fs.pathExists(filePath))) {
+				return { file, errors: [`File does not exist: ${filePath}`] };
+			}
 			const errors: string[] = [];
 
 			try {

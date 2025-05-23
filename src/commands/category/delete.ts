@@ -30,9 +30,20 @@ export async function deleteCategory(
 	// Validate slug parameter
 	if (!opts.slug) {
 		spinner.text = "Reading category files";
-		const categoryFiles = (await fs.readdir(paths.categories)).filter((f) =>
-			f.endsWith(".md"),
-		);
+		if (!paths.categories) {
+			logger.spinnerWarn("Categories directory not found.");
+			return;
+		}
+		let categoryFiles: string[];
+		try {
+			const allFiles = await fs.readdir(paths.categories);
+			categoryFiles = allFiles.filter((f) => f.endsWith(".md"));
+		} catch (e) {
+			logger.spinnerError(
+				`Failed to read categories directory: ${(e as Error).message}`,
+			);
+			return;
+		}
 
 		if (!categoryFiles.length) {
 			logger.spinnerWarn("No categories to delete.");
@@ -63,6 +74,10 @@ export async function deleteCategory(
 
 	// Check if category exists
 	const categoriesDir = paths.categories;
+	if (!categoriesDir) {
+		logger.error("Category directory not found.");
+		return;
+	}
 	const filePath = path.join(categoriesDir, `${opts.slug}.md`);
 
 	if (!(await fs.pathExists(filePath))) {
@@ -74,7 +89,7 @@ export async function deleteCategory(
 	spinner.text = "Checking for article references";
 	const articlesDir = paths.articles;
 
-	if (await fs.pathExists(articlesDir)) {
+	if (articlesDir && (await fs.pathExists(articlesDir))) {
 		const articleFiles = await fs.readdir(articlesDir);
 		const referencingArticles = [];
 

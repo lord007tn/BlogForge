@@ -115,7 +115,7 @@ async function promptForMultilingualValue(
 			const langCodePrompt = await prompts({
 				type: "text",
 				name: "langCode",
-				message: `Language code for ${fieldTitle} (e.g., en, fr), or leave blank to finish:`,
+				message: `Language code for ${fieldTitle} (e.g., en, ar), or leave blank to finish:`,
 			});
 			const langCode =
 				typeof langCodePrompt.langCode === "string"
@@ -233,7 +233,11 @@ export async function createCategory(opts: CreateCategoryOptions) {
 
 	spinner.start("Processing category data");
 
-	const categoriesDir = paths.categories;
+	const categoriesDir = paths.categories ?? "";
+	if (!categoriesDir) {
+		logger.spinnerError("Categories directory is not defined in project paths.");
+		return;
+	}
 	const filePath = path.join(categoriesDir, `${categorySlug}.md`);
 
 	if (await fs.pathExists(filePath)) {

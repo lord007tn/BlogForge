@@ -94,8 +94,8 @@ export default {
 
   // Multilingual settings
   multilingual: true,
-  languages: ["en", "fr", "es"],
-  defaultLanguage: "en",
+  languages: ["en", "ar"],
+  defaultLanguage: "ar",
 
   // Schema extensions
   schemaExtensions: {

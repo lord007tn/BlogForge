@@ -123,7 +123,7 @@ async function promptForMultilingualValue(
 			const langCodePrompt = await prompts({
 				type: "text",
 				name: "langCode",
-				message: `Language code for ${fieldTitle} (e.g., en, fr), or leave blank to finish:`,
+				message: `Language code for ${fieldTitle} (e.g., en, ar), or leave blank to finish:`,
 			});
 			const langCode =
 				typeof langCodePrompt.langCode === "string"
@@ -271,6 +271,10 @@ export async function createAuthor(opts: CreateAuthorOptions) {
 	spinner.start("Processing author data");
 
 	const authorsDir = paths.authors;
+	if (!authorsDir) {
+		logger.spinnerError("Authors directory path is not defined.");
+		return;
+	}
 	const filePath = path.join(authorsDir, `${authorId}.md`);
 
 	if (await fs.pathExists(filePath)) {

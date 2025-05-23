@@ -24,12 +24,26 @@ export async function deleteAuthor(opts: DeleteAuthorOptions): Promise<void> {
 		return;
 	}
 
+	const authorsDir: string | null = paths.authors ?? null;
+	const articlesDir: string | null = paths.articles ?? null;
+
 	// Validate id parameter
 	if (!opts.id) {
+		if (!authorsDir) {
+			logger.spinnerError("Authors directory path is not defined.");
+			return;
+		}
 		spinner.text = "Reading author files";
-		const authorFiles = (await fs.readdir(paths.authors)).filter((f) =>
-			f.endsWith(".md"),
-		);
+		let authorFiles: string[];
+		try {
+			const allFiles = await fs.readdir(authorsDir);
+			authorFiles = allFiles.filter((f: string) => f.endsWith(".md"));
+		} catch (e) {
+			logger.spinnerError(
+				`Failed to read authors directory: ${(e as Error).message}`,
+			);
+			return;
+		}
 
 		if (!authorFiles.length) {
 			logger.spinnerWarn("No authors to delete.");
@@ -37,7 +51,7 @@ export async function deleteAuthor(opts: DeleteAuthorOptions): Promise<void> {
 		}
 
 		spinner.stop();
-		const authorOptions = authorFiles.map((file) => ({
+		const authorOptions = authorFiles.map((file: string) => ({
 			title: file.replace(".md", ""),
 			value: file.replace(".md", ""),
 		}));
@@ -59,7 +73,10 @@ export async function deleteAuthor(opts: DeleteAuthorOptions): Promise<void> {
 	}
 
 	// Check if author exists
-	const authorsDir = paths.authors;
+	if (!authorsDir) {
+		logger.spinnerError("Authors directory path is not defined.");
+		return;
+	}
 	const filePath = path.join(authorsDir, `${opts.id}.md`);
 
 	if (!(await fs.pathExists(filePath))) {
@@ -69,15 +86,13 @@ export async function deleteAuthor(opts: DeleteAuthorOptions): Promise<void> {
 
 	// Check if author is referenced in any articles
 	spinner.text = "Checking for article references";
-	const articlesDir = paths.articles;
-
-	if (await fs.pathExists(articlesDir)) {
-		const articleFiles = await fs.readdir(articlesDir);
-		const referencingArticles = [];
+	if (articlesDir && (await fs.pathExists(articlesDir))) {
+		const articleFiles = (await fs.readdir(articlesDir)).filter((f: string) =>
+			f.endsWith(".md"),
+		);
+		const referencingArticles: string[] = [];
 
 		for (const file of articleFiles) {
-			if (!file.endsWith(".md")) continue;
-
 			const articlePath = path.join(articlesDir, file);
 			const content = await fs.readFile(articlePath, "utf-8");
 

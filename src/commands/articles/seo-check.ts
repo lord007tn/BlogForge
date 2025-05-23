@@ -412,6 +412,10 @@ export async function seoCheck(opts: SeoCheckOptions) {
 	let articlesDir: string;
 	try {
 		const paths = await getProjectPaths(process.cwd());
+		if (!paths.articles) {
+			logger.spinnerError("Articles directory path is not set in project paths.");
+			return;
+		}
 		articlesDir = paths.articles;
 		spinner.text = "Checking articles directory";
 	} catch (e) {
@@ -439,7 +443,15 @@ export async function seoCheck(opts: SeoCheckOptions) {
 		}
 	} else {
 		// Get all article files
-		files = (await fs.readdir(articlesDir)).filter((f) => f.endsWith(".md"));
+		try {
+			const allFiles = await fs.readdir(articlesDir);
+			files = allFiles.filter((f) => f.endsWith(".md"));
+		} catch (e) {
+			logger.spinnerError(
+				`Failed to read articles directory: ${(e as Error).message}`,
+			);
+			return;
+		}
 	}
 
 	if (!files.length) {

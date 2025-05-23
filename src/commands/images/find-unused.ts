@@ -26,6 +26,12 @@ export async function findUnusedImages(opts: FindUnusedImagesOptions) {
 		} else {
 			imagesDir = path.join(paths.public, "images");
 		}
+		if (!paths.articles) {
+			logger.spinnerError(
+				"Articles directory is not defined in project configuration.",
+			);
+			return;
+		}
 		articlesDir = paths.articles;
 		spinner.text = "Checking directories";
 	} catch (e) {

@@ -13,13 +13,20 @@ export async function listAuthors(opts: { verbose?: boolean }) {
 	const spinner = logger.spinner("Finding authors");
 
 	// Get project paths
-	let authorsDir: string;
+	let authorsDir: string | null;
 	try {
 		const paths = await getProjectPaths(process.cwd());
 		authorsDir = paths.authors;
 		spinner.text = "Checking authors directory";
 	} catch (e) {
 		logger.spinnerError(`Project validation failed: ${(e as Error).message}`);
+		return;
+	}
+
+	if (!authorsDir) {
+		logger.spinnerError(
+			"No authors directory path resolved (null). Project may use remote sources or is misconfigured.",
+		);
 		return;
 	}
 
@@ -31,7 +38,16 @@ export async function listAuthors(opts: { verbose?: boolean }) {
 
 	// Get author files
 	spinner.text = "Reading author files";
-	const files = (await fs.readdir(authorsDir)).filter((f) => f.endsWith(".md"));
+	let files: string[];
+	try {
+		const allFiles = await fs.readdir(authorsDir);
+		files = allFiles.filter((f: string) => f.endsWith(".md"));
+	} catch (e) {
+		logger.spinnerError(
+			`Failed to read authors directory: ${(e as Error).message}`,
+		);
+		return;
+	}
 
 	if (!files.length) {
 		logger.spinnerWarn("No authors found.");

@@ -28,17 +28,30 @@ export async function doctorArticles(opts: {
 		return;
 	}
 
-	// Check if articles directory exists
-	if (!(await fs.pathExists(paths.articles))) {
+	// Check if articles directory is valid
+	if (!paths.articles) {
+		logger.spinnerError(
+			"No articles directory path resolved (null). Project may use remote sources or is misconfigured.",
+		);
+		return;
+	}
+	const articlesDir = paths.articles;
+	if (!(await fs.pathExists(articlesDir))) {
 		logger.spinnerError("No articles directory found.");
 		return;
 	}
-
 	// Get article files
 	spinner.text = "Finding article files";
-	const files = (await fs.readdir(paths.articles)).filter((f) =>
-		f.endsWith(".md"),
-	);
+	let files: string[];
+	try {
+		const allFiles = await fs.readdir(articlesDir);
+		files = allFiles.filter((f: string) => f.endsWith(".md"));
+	} catch (e) {
+		logger.spinnerError(
+			`Failed to read articles directory: ${(e as Error).message}`,
+		);
+		return;
+	}
 
 	if (!files.length) {
 		logger.spinnerWarn("No articles found to check.");
@@ -62,25 +75,27 @@ export async function doctorArticles(opts: {
 	// 7. Inconsistent slug/filename
 
 	// Get available authors
-	const authorFiles = (await fs.pathExists(paths.authors))
-		? (await fs.readdir(paths.authors))
-				.filter((f) => f.endsWith(".md"))
-				.map((f) => f.replace(/\.md$/, ""))
-		: [];
+	const authorFiles =
+		paths.authors && (await fs.pathExists(paths.authors))
+			? (await fs.readdir(paths.authors))
+					.filter((f: string) => f.endsWith(".md"))
+					.map((f: string) => f.replace(/\.md$/, ""))
+			: [];
 
 	// Get available categories
-	const categoryFiles = (await fs.pathExists(paths.categories))
-		? (await fs.readdir(paths.categories))
-				.filter((f) => f.endsWith(".md"))
-				.map((f) => f.replace(/\.md$/, ""))
-		: [];
+	const categoryFiles =
+		paths.categories && (await fs.pathExists(paths.categories))
+			? (await fs.readdir(paths.categories))
+					.filter((f: string) => f.endsWith(".md"))
+					.map((f: string) => f.replace(/\.md$/, ""))
+			: [];
 
 	for (const file of files) {
 		if (opts.verbose) {
 			spinner.text = `Checking ${file}`;
 		}
 
-		const filePath = path.join(paths.articles, file);
+		const filePath = path.join(articlesDir, file);
 		const content = await fs.readFile(filePath, "utf-8");
 		const { frontmatter } = extractFrontmatter(content);
 
@@ -107,10 +122,15 @@ export async function doctorArticles(opts: {
 		// Validate against schema
 		try {
 			articleSchema.parse(frontmatter);
-		} catch (validationError: any) {
+		} catch (validationError) {
 			// If there are schema validation errors not already caught by our manual checks
-			if (validationError.errors) {
-				for (const error of validationError.errors) {
+			if (
+				typeof validationError === "object" &&
+				validationError &&
+				"errors" in validationError &&
+				Array.isArray((validationError as any).errors)
+			) {
+				for (const error of (validationError as { errors: any[] }).errors) {
 					// Only add errors that weren't already caught by our manual check
 					if (!missing.includes(error.path[0])) {
 						fileIssues.push(
@@ -179,7 +199,7 @@ export async function doctorArticles(opts: {
 						);
 						isFixable = true; // Image optimization is fixable
 					}
-				} catch (_) {
+				} catch {
 					// Ignore stat errors
 				}
 			}
@@ -273,7 +293,7 @@ export async function doctorArticles(opts: {
 			for (const issue of issues) {
 				if (!issue.fixable) continue;
 
-				const filePath = path.join(paths.articles, issue.file);
+				const filePath = path.join(articlesDir, issue.file);
 				const content = await fs.readFile(filePath, "utf-8");
 				const { frontmatter, content: bodyContent } =
 					extractFrontmatter(content);

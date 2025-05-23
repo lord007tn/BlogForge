@@ -24,16 +24,23 @@ export async function doctorCategories(opts: {
 	}
 
 	// Check if categories directory exists
-	if (!(await fs.pathExists(paths.categories))) {
+	if (!paths.categories || !(await fs.pathExists(paths.categories))) {
 		logger.spinnerError("No categories directory found.");
 		return;
 	}
 
 	// Get category files
 	spinner.text = "Finding category files";
-	const files = (await fs.readdir(paths.categories)).filter((f) =>
-		f.endsWith(".md"),
-	);
+	let files: string[];
+	try {
+		const allFiles = paths.categories ? await fs.readdir(paths.categories) : [];
+		files = allFiles.filter((f) => f.endsWith(".md"));
+	} catch (e) {
+		logger.spinnerError(
+			`Failed to read categories directory: ${(e as Error).message}`,
+		);
+		return;
+	}
 
 	if (!files.length) {
 		logger.spinnerWarn("No categories found to check.");
@@ -50,7 +57,7 @@ export async function doctorCategories(opts: {
 	// Create a schema with the project's config
 	const categorySchema = createCategorySchema(paths.config);
 	const isMultilingual = paths.config.multilingual;
-	const supportedLanguages = paths.config.languages || ['en'];
+	const supportedLanguages = paths.config.languages || ["en"];
 
 	// Check each category file
 	for (const file of files) {
@@ -135,8 +142,8 @@ export async function doctorCategories(opts: {
 							const obj = frontmatter[field] as Record<string, unknown>;
 
 							// Check if any of the supported languages exists
-							const hasAnySupportedLanguage = supportedLanguages.some((lang) =>
-								lang in obj,
+							const hasAnySupportedLanguage = supportedLanguages.some(
+								(lang) => lang in obj,
 							);
 
 							if (!hasAnySupportedLanguage) {

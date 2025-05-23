@@ -20,30 +20,46 @@ export async function searchArticles(opts: {
 	author?: string;
 	verbose?: boolean;
 }) {
+	const spinner = logger.spinner("Initializing search");
+
 	// Get project paths first, before any spinner
 	let articlesDir: string;
 	try {
 		const paths = await getProjectPaths(process.cwd());
+		if (!paths.articles) {
+			logger.spinnerError(
+				"Articles directory not found in project configuration.",
+			);
+			return;
+		}
 		articlesDir = paths.articles;
+		spinner.text = "Checking articles directory";
 	} catch (e) {
-		logger.error(`Project validation failed: ${(e as Error).message}`);
+		logger.spinnerError(`Project validation failed: ${(e as Error).message}`);
 		return;
 	}
 
 	// Check if articles directory exists
 	if (!(await fs.pathExists(articlesDir))) {
-		logger.error("No articles directory found.");
+		logger.spinnerError("No articles directory found.");
 		return;
 	}
 
-	const spinner = logger.spinner("Reading article files");
-	const files = (await fs.readdir(articlesDir)).filter((f) =>
-		f.endsWith(".md"),
-	);
+	// Verify we can read the directory
+	let files: string[];
+	try {
+		spinner.text = "Reading article files";
+		const allFiles = await fs.readdir(articlesDir);
+		files = allFiles.filter((f) => f.endsWith(".md"));
+	} catch (e) {
+		logger.spinnerError(
+			`Failed to read articles directory: ${(e as Error).message}`,
+		);
+		return;
+	}
 
 	if (!files.length) {
-		spinner.stop();
-		logger.info("No articles found to search.");
+		logger.spinnerWarn("No articles found to search.");
 		return;
 	}
 
@@ -60,8 +76,18 @@ export async function searchArticles(opts: {
 		if (opts.verbose) {
 			spinner.text = `Indexing article: ${file}`;
 		}
-		const filePath = path.join(articlesDir, file);
-		const fileContent = await fs.readFile(filePath, "utf-8");
+
+		let fileContent: string;
+		try {
+			const filePath = path.join(articlesDir, file);
+			fileContent = await fs.readFile(filePath, "utf-8");
+		} catch (e) {
+			console.log(
+				chalk.yellow(`Failed to read file ${file}: ${(e as Error).message}`),
+			);
+			continue;
+		}
+
 		const { frontmatter, content } = extractFrontmatter(fileContent);
 
 		// Skip if author filter is provided and doesn't match
@@ -73,10 +99,15 @@ export async function searchArticles(opts: {
 		try {
 			// Validate and type the frontmatter using the imported schema
 			parsedFrontmatter = articleSchema.parse(frontmatter);
-		} catch (e: any) {
-			// Changed logger.info to console.log to resolve linting error
-			const fieldPath = e.errors?.[0]?.path?.join(".") || "";
-			const validationMessage = e.errors?.[0]?.message || e.message;
+		} catch (e: unknown) {
+			// Handle schema validation errors with proper type safety
+			const error = e as {
+				errors?: { path?: string[]; message?: string }[];
+				message?: string;
+			};
+			const fieldPath = error.errors?.[0]?.path?.join(".") || "";
+			const validationMessage =
+				error.errors?.[0]?.message || error.message || String(e);
 			const errorMessage = `Skipping file "${file}" due to schema validation error: Field '${fieldPath}' - ${validationMessage}`;
 			console.log(chalk.yellow(errorMessage)); // Using chalk for visibility
 			continue; // Skip this file if frontmatter is invalid

@@ -49,7 +49,7 @@ export async function createArticle(opts: CreateArticleOptions) {
 	let authorChoices: { title: string; value: string }[] = [];
 
 	try {
-		if (await fs.pathExists(authorsDir)) {
+		if (authorsDir && (await fs.pathExists(authorsDir))) {
 			const authorFiles = await fs.readdir(authorsDir);
 			authorChoices = authorFiles
 				.filter((f) => f.endsWith(".md"))
@@ -70,7 +70,7 @@ export async function createArticle(opts: CreateArticleOptions) {
 	let categoryChoices: { title: string; value: string }[] = [];
 
 	try {
-		if (await fs.pathExists(categoriesDir)) {
+		if (categoriesDir && (await fs.pathExists(categoriesDir))) {
 			const categoryFiles = await fs.readdir(categoriesDir);
 			categoryChoices = categoryFiles
 				.filter((f) => f.endsWith(".md"))
@@ -190,6 +190,7 @@ export async function createArticle(opts: CreateArticleOptions) {
 	if (
 		authorChoices.length === 0 &&
 		articleData.author &&
+		authorsDir &&
 		!(await fs.pathExists(path.join(authorsDir, `${articleData.author}.md`)))
 	) {
 		logger.spinnerError(
@@ -217,10 +218,10 @@ export async function createArticle(opts: CreateArticleOptions) {
 		return;
 	}
 
-	// Validate category exists if provided and not selected from a list
 	if (
 		categoryChoices.length === 0 &&
 		articleData.category &&
+		categoriesDir &&
 		!(await fs.pathExists(
 			path.join(categoriesDir, `${articleData.category}.md`),
 		))
@@ -235,6 +236,7 @@ export async function createArticle(opts: CreateArticleOptions) {
 		);
 		return;
 	}
+
 	if (
 		categoryChoices.length > 0 &&
 		articleData.category &&
@@ -338,7 +340,7 @@ Your conclusion goes here...
 
 	// Write file
 	spinner.text = `Writing article to ${filename}.md`;
-	const filePath = path.join(paths.articles, `${filename}.md`);
+	const filePath = path.join(paths.articles ?? "", `${filename}.md`);
 
 	try {
 		await fs.writeFile(filePath, frontmatter, "utf-8");
