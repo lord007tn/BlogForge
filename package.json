@@ -19,7 +19,6 @@
 		"lint:fix": "biome lint --apply ./src",
 		"format": "biome format ./src",
 		"format:fix": "biome format --write ./src",
-		"test": "echo \\\"Error: no test specified\\\" && exit 1",
 		"prepare": "husky",
 		"release": "standard-version",
 		"commit": "cz"
