@@ -35,8 +35,8 @@ jobs:
 
   draft_release_notes:
     name: Draft Release Notes
-    # This job runs only on pushes to the main branch
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # This job runs only on pushes to the master branch
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
       contents: write # Required to create/update GitHub release drafts
