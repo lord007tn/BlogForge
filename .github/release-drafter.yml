@@ -1,7 +1,8 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 
-include-pre-releases: true
+# Include all changes, not just PRs
+include-pre-releases: false
 commitish: master
 
 categories:
@@ -26,9 +27,9 @@ categories:
     labels:
       - 'breaking-change'
 
-change-template: '- $TITLE (#$NUMBER)'
-no-changes-template: '- No changes yet'
-change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
+change-template: '- $TITLE @$AUTHOR'
+no-changes-template: '- No changes'
+change-title-escapes: '\<*_&'
 
 version-resolver:
   major:
@@ -51,13 +52,14 @@ version-resolver:
   default: patch
 
 template: |
-  ## Changes
+  ## What's Changed
 
   $CHANGES
 
-  ## Contributors
+  ## New Contributors
+  $CONTRIBUTORS
 
-  Thanks to all contributors who made this release possible!
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
 
 exclude-labels:
   - 'skip-changelog'
@@ -66,25 +68,31 @@ exclude-labels:
   - 'invalid'
   - 'wontfix'
 
+# Enhanced autolabeler for conventional commits  
 autolabeler:
   - label: 'feature'
     title:
-      - '/^feat(\(.+\))?\!?:.+$/i'
+      - '/^feat(\(.+\))?\!?:/i'
   - label: 'bug'
     title:
-      - '/^fix(\(.+\))?\!?:.+$/i'
+      - '/^fix(\(.+\))?\!?:/i'
   - label: 'documentation'
     title:
-      - '/^docs(\(.+\))?\!?:.+$/i'
+      - '/^docs(\(.+\))?\!?:/i'
     files:
       - '*.md'
       - 'docs/**'
   - label: 'chore'
     title:
-      - '/^chore(\(.+\))?\!?:.+$/i'
-      - '/^ci(\(.+\))?\!?:.+$/i'
-      - '/^build(\(.+\))?\!?:.+$/i'
-      - '/^refactor(\(.+\))?\!?:.+$/i'
+      - '/^chore(\(.+\))?\!?:/i'
+      - '/^ci(\(.+\))?\!?:/i'
+      - '/^build(\(.+\))?\!?:/i'
+      - '/^refactor(\(.+\))?\!?:/i'
   - label: 'breaking-change'
     title:
-      - '/^.+\!:.+$/i'
+      - '/^.*\!:/i'
+
+# Replacers to clean up commit messages
+replacers:
+  - search: '/^(feat|fix|docs|chore|ci|build|refactor)(\(.+\))?\!?:\s*/i'
+    replace: ''

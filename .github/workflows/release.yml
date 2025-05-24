@@ -1,4 +1,4 @@
-name: Release CI
+name: Release & Publish
 
 on:
   push:
@@ -8,8 +8,9 @@ on:
     types: [published]
 
 jobs:
+  # Build and test the project
   build:
-    name: Build
+    name: Build & Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -18,59 +19,124 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22.x' # Specify your project's Node.js version
-          cache: 'npm' # Cache npm dependencies
+          node-version: '22.x'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci # Clean install of dependencies
+        run: npm ci
+
+      - name: Lint code
+        run: npm run lint
 
       - name: Build project
-        # This step runs your build script if it exists in package.json
-        run: |
-          if [ -n "$(node -p "require('./package.json').scripts.build")" ]; then
-            npm run build
-          else
-            echo "No build script found in package.json, skipping build step."
-          fi
+        run: npm run build
 
-  publish_to_npm:
-    name: Publish to npm
-    if: github.event_name == 'release' && github.event.action == 'published'
-    needs: build # Ensures build and tests pass before publishing
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+  # Create release draft using release-drafter
+  create_release_draft:
+    name: Create Release Draft
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: build
     runs-on: ubuntu-latest
     permissions:
-      contents: read # Required to checkout code and read package.json
-      id-token: write # Required for OIDC (trusted publishing) with npm
-
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if release is needed
+        id: check_commits
+        run: |
+          # Get last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "Last tag: $LAST_TAG"
+          
+          # Get commits since last tag
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --oneline --pretty=format:"%s")
+          else
+            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --pretty=format:"%s")
+          fi
+          
+          echo "Commits since last tag:"
+          echo "$COMMITS"
+          
+          # Check if there are any commits that warrant a release
+          SHOULD_RELEASE=false
+          if echo "$COMMITS" | grep -qE "^(feat|fix|perf|revert|docs|style|refactor|test|build|ci|chore|BREAKING CHANGE)"; then
+            SHOULD_RELEASE=true
+          fi
+          
+          echo "Should release: $SHOULD_RELEASE"
+          echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+
+      - name: Run Release Drafter
+        if: steps.check_commits.outputs.should_release == 'true'
+        uses: release-drafter/release-drafter@v5
+        with:
+          config-name: release-drafter.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publish to npm when release is published
+  publish_to_npm:
+    name: Publish to npm
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Node.js for publishing
         uses: actions/setup-node@v4
         with:
           node-version: '22.x'
           registry-url: 'https://registry.npmjs.org/'
+          cache: 'npm'
 
       - name: Install dependencies
-        # Re-install dependencies in the clean publish environment
         run: npm ci
 
-      - name: Build project (if build artifacts are part of the package)
-        # Re-run build if necessary to ensure all distributable files are present
+      - name: Configure Git
         run: |
-          if [ -n "$(node -p "require('./package.json').scripts.build")" ]; then
-            npm run build
-          else
-            echo "No build script found in package.json, skipping build step for publish."
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update package.json and CHANGELOG with standard-version
+        run: |
+          # Extract version from release tag
+          RELEASE_VERSION="${{ github.event.release.tag_name }}"
+          VERSION_WITHOUT_V=$(echo $RELEASE_VERSION | sed 's/^v//')
+          
+          echo "Release version: $RELEASE_VERSION"
+          echo "Version without v: $VERSION_WITHOUT_V"
+          
+          # Run standard-version to update package.json and CHANGELOG.md
+          npx standard-version --release-as $VERSION_WITHOUT_V --skip.tag
+          
+          # Push changes back to master
+          git push origin master
+
+      - name: Build project
+        run: npm run build
 
       - name: Verify version consistency
-        # Ensures the version in package.json matches the GitHub release tag
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
           GIT_TAG_VERSION=${{ github.event.release.tag_name }}
-          # GitHub tags might be v1.2.3 or 1.2.3. Strip 'v' for comparison.
           GIT_TAG_VERSION_STRIPPED=$(echo $GIT_TAG_VERSION | sed 's/^v//')
 
           echo "Package.json version: $PKG_VERSION"
@@ -78,7 +144,6 @@ jobs:
 
           if [ "$PKG_VERSION" != "$GIT_TAG_VERSION_STRIPPED" ]; then
             echo "Error: package.json version ($PKG_VERSION) does not match git tag version ($GIT_TAG_VERSION_STRIPPED)."
-            echo "Ensure package.json version is updated and matches the release tag before publishing the release."
             exit 1
           fi
 
