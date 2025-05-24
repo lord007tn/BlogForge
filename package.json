@@ -1,6 +1,6 @@
 {
 	"name": "blogforge",
-	"version": "0.1.13",
+	"version": "0.1.14",
 	"description": "A powerful CLI tool for managing Nuxt Content v3 blogs",
 	"type": "module",
 	"main": "dist/index.js",
