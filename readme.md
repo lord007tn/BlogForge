@@ -143,6 +143,54 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
+## Development Workflow
+
+1. **Fork** the repository
+2. **Clone** your fork locally
+3. **Create a feature branch**: `git checkout -b feat/your-feature-name`
+4. **Make your changes** following our [coding standards](CONTRIBUTING.md)
+5. **Commit** using [conventional commits](https://www.conventionalcommits.org/):
+   ```bash
+   git commit -m "feat(cli): add new article template command"
+   ```
+6. **Push** to your fork: `git push origin feat/your-feature-name`
+7. **Create a Pull Request** with a clear description
+
+### Quick Commands
+
+```bash
+# Install dependencies
+npm install
+
+# Lint code
+npm run lint
+
+# Build project
+npm run build
+
+# Run in development
+npm run dev
+```
+
+### Branch Protection
+
+Our `master` branch is protected with the following rules:
+- ✅ Pull request reviews required (1 approval)
+- ✅ Status checks must pass (Build & Test, PR Validation)
+- ✅ Branches must be up to date
+- ✅ Conversations must be resolved
+- ❌ Force pushes disabled
+
+### Release Process
+
+We use [Release Drafter](https://github.com/release-drafter/release-drafter) to automatically generate release notes from Pull Requests. The release process is:
+
+1. **Merge PRs** to `master` - this updates the release draft
+2. **Review** the generated release notes
+3. **Publish** the release - this triggers npm publishing
+
+For more details, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## BlogForge CLI: Future Implementation Roadmap
 
 ### AI SDK Integration

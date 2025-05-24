@@ -7,9 +7,7 @@
 	"bin": {
 		"blogforge": "dist/index.js"
 	},
-	"files": [
-		"dist"
-	],
+	"files": ["dist"],
 	"scripts": {
 		"build": "tsup src/index.ts --format esm --dts",
 		"dev": "tsx src/index.ts",
@@ -21,7 +19,11 @@
 		"format:fix": "biome format --write ./src",
 		"prepare": "husky",
 		"release": "standard-version",
-		"commit": "cz"
+		"commit": "cz",
+		"workflow:migrate": "bash scripts/migrate-to-pr-workflow.sh",
+		"workflow:help": "echo 'See docs/DEVELOPMENT_WORKFLOW.md for complete guide'",
+		"pr:ready": "npm run lint && npm run build && echo 'PR ready! ✅'",
+		"sync:upstream": "git fetch upstream && git checkout master && git merge upstream/master && git push origin master"
 	},
 	"keywords": [
 		"nuxt",
@@ -129,9 +131,7 @@
 		}
 	},
 	"lint-staged": {
-		"*.{js,ts,tsx}": [
-			"biome check --write"
-		]
+		"*.{js,ts,tsx}": ["biome check --write"]
 	},
 	"homepage": "https://github.com/lord007tn/BlogForge",
 	"bugs": {

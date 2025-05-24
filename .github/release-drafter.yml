@@ -1,7 +1,7 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 
-# Include all changes, not just PRs
+# Configuration for PR-based workflow
 include-pre-releases: false
 commitish: master
 
@@ -10,24 +10,28 @@ categories:
     labels:
       - 'feature'
       - 'enhancement'
+    collapse-after: 3
   - title: '🐛 Bug Fixes'
     labels:
       - 'bug'
       - 'fix'
+    collapse-after: 3
   - title: '📚 Documentation'
     labels:
       - 'documentation'
       - 'docs'
+    collapse-after: 3
   - title: '🧹 Maintenance'
     labels:
       - 'maintenance'
       - 'chore'
       - 'dependencies'
+    collapse-after: 3
   - title: '⚠️ Breaking Changes'
     labels:
       - 'breaking-change'
 
-change-template: '- $TITLE @$AUTHOR'
+change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
 no-changes-template: '- No changes'
 change-title-escapes: '\<*_&'
 
@@ -68,31 +72,65 @@ exclude-labels:
   - 'invalid'
   - 'wontfix'
 
-# Enhanced autolabeler for conventional commits  
+# Enhanced autolabeler for conventional commits and files
 autolabeler:
   - label: 'feature'
     title:
       - '/^feat(\(.+\))?\!?:/i'
+      - '/^Feature:/i'
+    branch:
+      - '/^feature\/.+/'
+      - '/^feat\/.+/'
   - label: 'bug'
     title:
       - '/^fix(\(.+\))?\!?:/i'
+      - '/^Fix:/i'
+      - '/^Bug:/i'
+    branch:
+      - '/^fix\/.+/'
+      - '/^bug\/.+/'
+      - '/^hotfix\/.+/'
   - label: 'documentation'
     title:
       - '/^docs(\(.+\))?\!?:/i'
+      - '/^Documentation:/i'
     files:
       - '*.md'
-      - 'docs/**'
+      - 'docs/**/*'
+      - '.github/**/*'
+    branch:
+      - '/^docs\/.+/'
   - label: 'chore'
     title:
       - '/^chore(\(.+\))?\!?:/i'
       - '/^ci(\(.+\))?\!?:/i'
       - '/^build(\(.+\))?\!?:/i'
       - '/^refactor(\(.+\))?\!?:/i'
+      - '/^Chore:/i'
+    files:
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/**/*'
+      - '.gitignore'
+      - 'tsconfig.json'
+      - 'biome.json'
+    branch:
+      - '/^chore\/.+/'
+      - '/^refactor\/.+/'
+  - label: 'dependencies'
+    title:
+      - '/^(chore|build)(\(.+\))?\!?:\s*(bump|update|upgrade)/i'
+    files:
+      - 'package.json'
+      - 'package-lock.json'
   - label: 'breaking-change'
     title:
       - '/^.*\!:/i'
+      - '/^BREAKING CHANGE:/i'
 
-# Replacers to clean up commit messages
+# Replacers to clean up commit messages in release notes
 replacers:
   - search: '/^(feat|fix|docs|chore|ci|build|refactor)(\(.+\))?\!?:\s*/i'
+    replace: ''
+  - search: '/^(Feature|Fix|Bug|Documentation|Chore):\s*/i'
     replace: ''
