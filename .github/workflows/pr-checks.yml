@@ -63,7 +63,7 @@ jobs:
           
           required_files=(
             "package.json"
-            "README.md"
+            "readme.md"
             "CHANGELOG.md"
             "LICENSE"
             "CONTRIBUTING.md"
