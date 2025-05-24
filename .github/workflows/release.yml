@@ -6,6 +6,8 @@ on:
   push:
     branches:
       - master
+      - main
+      - dev
   release:
     types: [published]
 
@@ -42,7 +44,7 @@ jobs:
   # Update release draft when changes are pushed to master
   update_release_draft:
     name: Update Release Draft
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -97,9 +99,9 @@ jobs:
           
           # Run standard-version to update package.json and CHANGELOG.md
           npx standard-version --release-as $VERSION_WITHOUT_V --skip.tag
-          
-          # Push changes back to master
-          git push origin master
+            # Push changes back to the current branch
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          git push origin $CURRENT_BRANCH
 
       - name: Build project
         run: npm run build
