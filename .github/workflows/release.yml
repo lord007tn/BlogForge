@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - master
-      - main
       - dev
   release:
     types: [published]
@@ -44,7 +43,7 @@ jobs:
   # Update release draft when changes are pushed to master
   update_release_draft:
     name: Update Release Draft
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
     needs: build
     runs-on: ubuntu-latest
     permissions:
