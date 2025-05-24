@@ -1,6 +1,8 @@
 name: Release & Publish
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   push:
     branches:
       - master
@@ -8,7 +10,7 @@ on:
     types: [published]
 
 jobs:
-  # Build and test the project
+  # Build and test the project for all PRs and pushes
   build:
     name: Build & Test
     runs-on: ubuntu-latest
@@ -36,49 +38,18 @@ jobs:
         with:
           name: dist
           path: dist/
-  # Create release draft using release-drafter
-  create_release_draft:
-    name: Create Release Draft
+
+  # Update release draft when changes are pushed to master
+  update_release_draft:
+    name: Update Release Draft
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
+      pull-requests: read
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check if release is needed
-        id: check_commits
-        run: |
-          # Get last tag
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          echo "Last tag: $LAST_TAG"
-          
-          # Get commits since last tag
-          if [ -z "$LAST_TAG" ]; then
-            COMMITS=$(git log --oneline --pretty=format:"%s")
-          else
-            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline --pretty=format:"%s")
-          fi
-          
-          echo "Commits since last tag:"
-          echo "$COMMITS"
-          
-          # Check if there are any commits that warrant a release
-          SHOULD_RELEASE=false
-          if echo "$COMMITS" | grep -qE "^(feat|fix|perf|revert|docs|style|refactor|test|build|ci|chore|BREAKING CHANGE)"; then
-            SHOULD_RELEASE=true
-          fi
-          
-          echo "Should release: $SHOULD_RELEASE"
-          echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
-
       - name: Run Release Drafter
-        if: steps.check_commits.outputs.should_release == 'true'
         uses: release-drafter/release-drafter@v5
         with:
           config-name: release-drafter.yml
