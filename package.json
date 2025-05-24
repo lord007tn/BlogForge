@@ -1,13 +1,15 @@
 {
 	"name": "blogforge",
-	"version": "0.1.10",
+	"version": "0.1.13",
 	"description": "A powerful CLI tool for managing Nuxt Content v3 blogs",
 	"type": "module",
 	"main": "dist/index.js",
 	"bin": {
 		"blogforge": "dist/index.js"
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "tsup src/index.ts --format esm --dts",
 		"dev": "tsx src/index.ts",
@@ -131,7 +133,9 @@
 		}
 	},
 	"lint-staged": {
-		"*.{js,ts,tsx}": ["biome check --write"]
+		"*.{js,ts,tsx}": [
+			"biome check --write"
+		]
 	},
 	"homepage": "https://github.com/lord007tn/BlogForge",
 	"bugs": {
