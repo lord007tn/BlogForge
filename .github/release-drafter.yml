@@ -5,6 +5,11 @@ tag-template: 'v$RESOLVED_VERSION'
 include-pre-releases: false
 commitish: master
 
+# Filter out bots from contributor lists  
+exclude-contributors:
+  - 'dependabot[bot]'
+  - 'github-actions[bot]'
+
 categories:
   - title: '🚀 Features'
     labels:
@@ -31,7 +36,7 @@ categories:
     labels:
       - 'breaking-change'
 
-change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+change-template: '- $TITLE (#$NUMBER) by @$AUTHOR'
 no-changes-template: '- No changes'
 change-title-escapes: '\<*_&'
 
@@ -59,10 +64,10 @@ template: |
   ## What's Changed
 
   $CHANGES
-
-  ## New Contributors
+  
+  ## Thanks ❤️
   $CONTRIBUTORS
-
+  
   **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
 
 exclude-labels:
