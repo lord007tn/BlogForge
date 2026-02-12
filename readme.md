@@ -1,5 +1,7 @@
 # BlogForge 🖋️
 
+Archieved: use [nuxt.studio](https://nuxt.studio) instead
+
 The craftsman's toolkit for Nuxt Content v3 blogs – forge, shape, and perfect your content with precision.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
